@@ -1,6 +1,8 @@
 name: Deploy static dashboard
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 permissions:
   contents: read
 concurrency:
