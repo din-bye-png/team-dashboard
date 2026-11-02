@@ -1,0 +1,19 @@
+{
+  "name": "team-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "audit:public": "node scripts/audit-public.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.14",
+    "esbuild": "0.28.2"
+  }
+}

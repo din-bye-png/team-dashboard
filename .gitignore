@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env*
+*.local.*
+backups/
+exports/
+*.csv
+*.zip
+.DS_Store

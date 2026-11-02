@@ -1,0 +1,13 @@
+import {readFile} from 'node:fs/promises';
+import {createClient} from '@supabase/supabase-js';
+import {validState} from '../public/backend.js';
+const {SUPABASE_URL,SUPABASE_SECRET_KEY,WORKSPACE_ID}=process.env;
+if(!SUPABASE_URL||!SUPABASE_SECRET_KEY||!WORKSPACE_ID||!process.argv[2])throw new Error('Provide admin environment settings and a local backup file path. Do not commit the backup or environment.');
+const raw=await readFile(process.argv[2],'utf8');
+if(Buffer.byteLength(raw)>30_000_000)throw new Error('Backup too large');
+const backup=JSON.parse(raw);
+if(backup.formatVersion!==1||!validState({tasks:backup.tasks,trash:backup.trash})||!Array.isArray(backup.history))throw new Error('Invalid backup');
+const client=createClient(SUPABASE_URL,SUPABASE_SECRET_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+const {error}=await client.rpc('dashboard_import',{p_workspace:WORKSPACE_ID,p_backup:backup});
+if(error)throw new Error('Atomic import failed. No backup values or credentials have been logged.');
+console.log('Imported backlog and retained history. Historical authors remain unknown.');
