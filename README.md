@@ -18,7 +18,7 @@ The preview binds only to localhost. Without configuration the page shows a lock
 
 ## Supabase setup
 
-1. Choose a new Supabase project; apply `supabase/migrations/0001_dashboard.sql` through its SQL editor or migration tooling.
+1. Choose a new Supabase project; apply `supabase/migrations/0001_dashboard.sql`, then `supabase/migrations/0002_revoke_rls_auto_enable_and_fk_indexes.sql`, through its SQL editor or migration tooling. The second migration revokes `EXECUTE` on the hosted `public.rls_auto_enable()` function and adds the missing foreign-key indexes. It does not change membership policies or how saves work.
 2. Use Supabase Auth to create or invite each approved user. Disable public signups if the project is invite-only. Knowing the site URL or creating an Auth account does not grant membership.
 3. In the trusted SQL editor, create a workspace and its empty plan:
 
@@ -62,22 +62,16 @@ JSON export and a user-selected local backup file remain explicit optional featu
 
 ## GitHub Pages
 
-The output in `dist/` is static HTML/CSS/JS and works under a repository subpath. There are no Worker routes or old hosting bindings. `pages.yml` has only a manual trigger, so publishing code does not switch an existing website automatically. Configure the three public build settings as repository Actions variables and select GitHub Actions as the Pages source before deploying.
+The output in `dist/` is static HTML/CSS/JS and works under a repository subpath such as `/team-dashboard/`. Asset links, including the favicon, are relative to the page so they stay inside that subpath. There are no Worker routes or old hosting bindings. Configure the three public build settings as repository Actions variables and select GitHub Actions as the Pages source.
 
-The check workflow runs on pushes to `main` and `dashboard-public`. Publishing code does not deploy the website automatically: the Pages workflow has only a manual trigger. Deploy only after Supabase has been provisioned, data imported and authorization verified.
+`pages.yml` (Deploy static dashboard) publishes on every push to `main` and can still be started with `workflow_dispatch`. Its build job runs the tests and `audit:public` before the site is uploaded. The check workflow also runs on pushes to `main` and `dashboard-public`. Publish only after Supabase has been provisioned, data imported and authorization verified; a push to `main` deploys the site.
 
-## Daily private backup
+The favicon is a placeholder: a plain circle in the primary button blue (`#087dff`) on a transparent background. Replace `public/favicon.svg`, `public/favicon.png` and `public/apple-touch-icon.png` to change it.
 
-`backup.yml` prepares a daily run at 02:17 UTC (06:17 at UTC+4). Its job remains disabled until the repository Actions variable `BACKUP_ENABLED` is set to `true`; leave this unset until the destination, credentials and a manual backup have been verified. Scheduled triggers require the workflow on the default branch. GitHub schedules may be delayed. No data export runs merely because this source has been published.
+## Backups
 
-Create a **separate private** backup repository and initialize its default branch. Set these Actions secrets in the application repository:
-
-- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `WORKSPACE_ID` for the trusted admin backup RPC.
-- `BACKUP_REPOSITORY` in `owner/name` form.
-- `BACKUP_REPO_TOKEN`: a fine-grained GitHub token restricted to that backup repository, with metadata read and contents write.
-
-The script verifies that the destination is private and separate from the application repository before reading the backlog. It checks private visibility again before uploading, validates the export and writes a timestamped JSON snapshot directly to that repository. It never uploads a public Actions artifact or logs the backlog. Limit access to backup repo settings too: making that repo public later would expose its history. The workflow does not impose automatic permanent deletion or a retention policy. Auth password hashes, Auth service secrets and full database disaster recovery are outside the scope of this logical backlog backup.
+Scheduled backlog backups are not part of this public repository and must not be added here. They run only from the separate private repository `din-bye-png/team-dashboard-backups`, which already has its own workflow. Do not commit backup secrets, service-role keys, database passwords, GitHub tokens, or exported backlog files to this repository.
 
 ## Checks
 
-Tests exercise the migration in an isolated Postgres-compatible PGlite instance with Auth roles, anonymous and nonmember denial, membership escalation rejection, direct-write rejection, revision conflicts, invalid state, atomic snapshot failure and admin-only import. They do not substitute for checks against the configured live Supabase project with two real accounts. The public-file audit scans the source and built bundle for recognized credentials, former hosting IDs and disallowed export/media files; it is a safeguard, not a guarantee against every possible disclosure.
+Tests exercise the migrations in an isolated Postgres-compatible PGlite instance with Auth roles, anonymous and nonmember denial, membership escalation rejection, direct-write rejection, revision conflicts, invalid state, atomic snapshot failure and admin-only import. They do not substitute for checks against the configured live Supabase project with two real accounts. The public-file audit scans the source and built bundle for recognized credentials, former hosting IDs and disallowed export/media files; it is a safeguard, not a guarantee against every possible disclosure.

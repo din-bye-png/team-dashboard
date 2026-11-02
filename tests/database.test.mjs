@@ -64,5 +64,23 @@ test('Postgres enforces membership, validation, atomic revisions, author and adm
   await as('postgres');
   const imported=(await db.query('select * from public.dashboard_versions where workspace_id=$1',[other])).rows[0];
   assert.equal(imported.created_by,null);assert.deepEqual(imported.content,state);
+  const policiesBefore=(await db.query('select schemaname,tablename,policyname,permissive,roles::text,cmd,qual,with_check from pg_policies order by 1,2,3')).rows;
+  const saveDefBefore=(await db.query("select pg_get_functiondef('public.dashboard_save(uuid,bigint,jsonb,text)'::regprocedure) as def")).rows[0].def;
+  await db.exec("create function public.rls_auto_enable() returns void language plpgsql as $$ begin return; end $$");
+  const migration=await readFile('supabase/migrations/0002_revoke_rls_auto_enable_and_fk_indexes.sql','utf8');
+  await db.exec(migration);
+  await db.exec(migration);
+  for(const role of ['anon','authenticated','public']){
+    const allowed=(await db.query("select has_function_privilege($1,'public.rls_auto_enable()','execute') as allowed",[role])).rows[0].allowed;
+    assert.equal(allowed,false,role);
+  }
+  const indexes=(await db.query("select indexname from pg_indexes where schemaname='public' and indexname in ('dashboard_members_user_id_idx','dashboard_plans_updated_by_idx','dashboard_versions_created_by_idx') order by 1")).rows.map(row=>row.indexname);
+  assert.deepEqual(indexes,['dashboard_members_user_id_idx','dashboard_plans_updated_by_idx','dashboard_versions_created_by_idx']);
+  const policiesAfter=(await db.query('select schemaname,tablename,policyname,permissive,roles::text,cmd,qual,with_check from pg_policies order by 1,2,3')).rows;
+  assert.deepEqual(policiesAfter,policiesBefore);
+  assert.equal((await db.query("select pg_get_functiondef('public.dashboard_save(uuid,bigint,jsonb,text)'::regprocedure) as def")).rows[0].def,saveDefBefore);
+  await as('authenticated',member);
+  result=(await save(1,{tasks:[],trash:[]},'After migration')).rows[0].result;
+  assert.equal(result.revision,2);
   await db.close();
 });
