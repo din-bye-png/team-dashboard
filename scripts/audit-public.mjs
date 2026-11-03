@@ -3,7 +3,7 @@ import path from 'node:path';
 const permittedRoots=new Set(['public','scripts','tests','supabase','.github','dist']);
 const permittedFiles=new Set(['README.md','SECURITY.md','.gitignore','package.json','package-lock.json']);
 const forbiddenFiles=/\.(?:png|jpe?g|webp|pdf|csv|zip|sqlite|db|pem|key|map)$/i;
-const placeholderIcons=new Set(['public/favicon.png','public/apple-touch-icon.png','dist/favicon.png','dist/apple-touch-icon.png']);
+const reviewedImages=new Set(['public/favicon.png','public/apple-touch-icon.png','dist/favicon.png','dist/apple-touch-icon.png','public/team-logo.png','dist/team-logo.png']);
 const patterns=[
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/,
@@ -23,7 +23,7 @@ async function visit(directory='.'){
     if(directory==='.'&&!permittedRoots.has(entry.name)&&!permittedFiles.has(entry.name))throw new Error('Unexpected public file: '+relative);
     if(entry.isSymbolicLink())throw new Error('Symlink not permitted: '+relative);
     if(entry.isDirectory()){await visit(file);continue;}
-    if((forbiddenFiles.test(file)&&!placeholderIcons.has(relative))||/(^|\/)(?:backups|exports|media|\.openai)(\/|$)/.test(relative)||entry.name.startsWith('.env'))throw new Error('Private or unreviewed artifact: '+relative);
+    if((forbiddenFiles.test(file)&&!reviewedImages.has(relative))||/(^|\/)(?:backups|exports|media|\.openai)(\/|$)/.test(relative)||entry.name.startsWith('.env'))throw new Error('Private or unreviewed artifact: '+relative);
     const content=await readFile(file,'utf8');
     if(patterns.some(pattern=>pattern.test(content)))throw new Error('Potential credential or old hosting identity in '+relative);
     count++;
