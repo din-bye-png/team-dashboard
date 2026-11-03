@@ -4,6 +4,7 @@ const syncStatus=$('#syncStatus');
 function status(message,error=false){syncStatus.textContent=message;syncStatus.classList.toggle('error-text',error)}
 function controls(){ $('#add').disabled=!ready||saving;$('#import').disabled=!ready||saving;$('#form').querySelectorAll('button').forEach(b=>b.disabled=saving); }
 let authEpoch=0;
+const authLink=consumeAuthLink(window.location,window.history);
 const backend=createBackend(config);
 async function api(path,body){
  const started=authEpoch;
@@ -105,6 +106,7 @@ function clearPrivateView(){
  for(const id of ['trashList','versionList','versionPreview'])$('#'+id).replaceChildren();
  $('#person').value='';render();controls();$('#dashboard').hidden=true;$('#authScreen').hidden=false;
  $('#authForm').reset();$('#toast').textContent='';fileStatus('Файл не выбран');
+ $('#passwordForm').reset();$('#passwordForm').hidden=true;$('#authForm').hidden=false;$('#passwordError').textContent='';
 }
 if(backend)backend.onSignedOut(clearPrivateView);
 else{
@@ -124,6 +126,46 @@ $('#authForm').onsubmit=async event=>{
  finally{button.disabled=false;}
 };
 $('#logout').onclick=async()=>{clearPrivateView();await backend.signOut();};
+$('#cancelPassword').onclick=async()=>{clearPrivateView();await backend.signOut();};
+$('#passwordForm').onsubmit=async event=>{
+ event.preventDefault();if(!backend)return;
+ const form=event.target,button=form.querySelector('[type="submit"]');
+ const password=form.elements.password.value,confirmation=form.elements.confirmation.value;
+ $('#passwordError').textContent='';
+ if(password!==confirmation){$('#passwordError').textContent='Пароли не совпадают.';return;}
+ button.disabled=true;
+ try{
+  await backend.setPassword(password);
+  // The password is now saved even if workspace access has not been assigned yet.
+  form.reset();
+  const email=$('#authForm').elements.email.value;
+  await backend.signOut();clearPrivateView();$('#authForm').elements.email.value=email;
+  $('#authError').textContent='Пароль сохранён. Войдите с новым паролем.';
+ }catch(error){$('#passwordError').textContent=error.message;}
+ finally{button.disabled=false;}
+};
+async function initializeAuthLink(){
+ if(!authLink||!backend)return;
+ const button=$('#authForm').querySelector('button');button.disabled=true;
+ $('#authError').textContent='Проверяем ссылку…';
+ try{
+  const result=await backend.acceptAuthLink(authLink);
+  $('#authError').textContent='';$('#authForm').elements.email.value=result.email;
+  if(result.passwordSetup){
+   $('#authForm').hidden=true;$('#passwordForm').hidden=false;
+   $('#passwordIntro').textContent='Установите пароль для '+result.email+'.';
+   $('#passwordForm').elements.password.focus();
+  }else{
+   await backend.signOut();clearPrivateView();$('#authForm').elements.email.value=result.email;
+   $('#authError').textContent='Email подтверждён. Войдите с вашим паролем.';
+  }
+ }catch(error){await backend.signOut();clearPrivateView();$('#authError').textContent=error.message;}
+ finally{
+  // Do not retain a second reference to bearer credentials for this page's lifetime.
+  delete authLink.access_token;delete authLink.refresh_token;button.disabled=false;
+ }
+}
+initializeAuthLink();
 setInterval(()=>{if(ready)refresh();},10000);
 window.addEventListener('focus',()=>{if(ready){refresh();queueFile();}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ready){refresh();queueFile();}});

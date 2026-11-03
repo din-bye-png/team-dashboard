@@ -1,4 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
+import {expiredMessage} from './auth-link.js';
 
 export function configured(config) {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(config.supabaseUrl)
@@ -77,12 +78,12 @@ export function prepareChange(plan, body, restored, now=new Date().toISOString()
   return {state,reason};
 }
 
-export function createBackend(config) {
+export function createBackend(config,clientFactory=createClient) {
   if(!configured(config))return null;
-  const client=createClient(config.supabaseUrl,config.supabasePublishableKey,{
+  const client=clientFactory(config.supabaseUrl,config.supabasePublishableKey,{
     auth:{persistSession:false,detectSessionInUrl:false,autoRefreshToken:true},
   });
-  let current=null,epoch=0;
+  let current=null,epoch=0,passwordSetup=false;
   async function rpc(name,params) {
     const started=epoch;
     const {data,error}=await client.rpc(name,{p_workspace:config.workspaceId,...params});
@@ -128,11 +129,28 @@ export function createBackend(config) {
   }
   return {
     api,
+    async acceptAuthLink(link){
+      passwordSetup=false;
+      if(link.error)fail(link.error);
+      const {error}=await client.auth.setSession({access_token:link.access_token,refresh_token:link.refresh_token});
+      if(error){await client.auth.signOut({scope:'local'});fail(expiredMessage);}
+      const {data,error:userError}=await client.auth.getUser();
+      if(userError||!data?.user){await client.auth.signOut({scope:'local'});fail(expiredMessage);}
+      passwordSetup=['invite','recovery'].includes(link.type);
+      return {passwordSetup,email:data.user.email||''};
+    },
+    async setPassword(password){
+      if(!passwordSetup)fail('Откройте новую ссылку из письма.');
+      if(typeof password!=='string'||password.length<8||password.length>1024)fail('Используйте пароль от 8 до 1024 символов.');
+      const {error}=await client.auth.updateUser({password});
+      if(error)fail(error.code==='weak_password'?'Пароль слишком простой. Используйте более сложный пароль.':'Не удалось сохранить пароль. Проверьте соединение и попробуйте ещё раз.');
+      passwordSetup=false;
+    },
     async signIn(email,password){
       const {error}=await client.auth.signInWithPassword({email,password});
       if(error)fail('Не удалось войти. Проверьте данные и попробуйте ещё раз.');
     },
-    async signOut(){epoch++;current=null;await client.auth.signOut({scope:'local'});},
-    onSignedOut(callback){client.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){epoch++;current=null;callback();}});},
+    async signOut(){epoch++;current=null;passwordSetup=false;await client.auth.signOut({scope:'local'});},
+    onSignedOut(callback){client.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){epoch++;current=null;passwordSetup=false;callback();}});},
   };
 }

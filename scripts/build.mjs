@@ -10,7 +10,7 @@ for(const [key,env] of Object.entries({supabaseUrl:'PUBLIC_SUPABASE_URL',supabas
 if(Object.values(bundledConfig).some(Boolean)&&!configured(bundledConfig))throw new Error('Invalid public configuration; only an HTTPS Supabase URL, publishable key and workspace UUID are accepted.');
 await rm('dist',{recursive:true,force:true});await mkdir('dist');
 const sources=await Promise.all(['app.js','sync.js','reorder.js'].map(name=>readFile('public/'+name,'utf8')));
-const contents="import {createBackend} from './backend.js';\nconst config="+JSON.stringify(bundledConfig)+';\n'+sources.join('\n');
+const contents="import {createBackend} from './backend.js';\nimport {consumeAuthLink} from './auth-link.js';\nconst config="+JSON.stringify(bundledConfig)+';\n'+sources.join('\n');
 await build({stdin:{contents,resolveDir:process.cwd()+'/public',sourcefile:'main.js'},bundle:true,format:'iife',platform:'browser',target:'es2022',outfile:'dist/bundle.js',legalComments:'none',sourcemap:false});
 for(const name of ['index.html','style.css','favicon.svg','favicon.png','apple-touch-icon.png','team-logo.png'])await copyFile('public/'+name,'dist/'+name);
 await writeFile('dist/.nojekyll','');
