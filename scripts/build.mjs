@@ -12,6 +12,7 @@ await rm('dist',{recursive:true,force:true});await mkdir('dist');
 const sources=await Promise.all(['app.js','sync.js','reorder.js','task-context.js','bar-resize.js'].map(name=>readFile('public/'+name,'utf8')));
 const contents="import {materialIcon,safeMaterialUrl,MAX_FILE_SIZE,validMaterials} from './task-materials.js';\nimport {createBackend} from './backend.js';\nimport {consumeAuthLink} from './auth-link.js';\nconst config="+JSON.stringify(bundledConfig)+';\n'+sources.join('\n');
 await build({stdin:{contents,resolveDir:process.cwd()+'/public',sourcefile:'main.js'},bundle:true,format:'iife',platform:'browser',target:'es2022',outfile:'dist/bundle.js',legalComments:'none',sourcemap:false});
-for(const name of ['index.html','style.css','favicon.svg','favicon.png','apple-touch-icon.png','team-logo.png'])await copyFile('public/'+name,'dist/'+name);
+await build({stdin:{contents:'const config='+JSON.stringify(bundledConfig)+';\n'+await readFile('public/share.js','utf8'),resolveDir:process.cwd()+'/public',sourcefile:'share.js'},bundle:true,format:'iife',platform:'browser',target:'es2022',outfile:'dist/share-bundle.js',legalComments:'none',sourcemap:false});
+for(const name of ['index.html','style.css','share.html','share.css','favicon.svg','favicon.png','apple-touch-icon.png','team-logo.png'])await copyFile('public/'+name,'dist/'+name);
 await writeFile('dist/.nojekyll','');
 console.log(configured(bundledConfig)?'Static build ready (Supabase configured)':'Static build ready (locked until Supabase is configured)');

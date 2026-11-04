@@ -1,0 +1,65 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+
+test('public passport exposes one active task and revokes its link on demand or deletion',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
+   create schema auth;create table auth.users(id uuid primary key);
+   create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+   create function auth.role() returns text language sql stable as $$select current_setting('request.jwt.claim.role',true)$$;
+   grant usage on schema auth to anon,authenticated;
+   grant execute on function auth.uid(),auth.role() to anon,authenticated;
+   create schema storage;
+   create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint);
+   create table storage.objects(bucket_id text,name text);
+   alter table storage.objects enable row level security;
+   grant usage on schema storage to anon,authenticated;
+   grant select,insert,update,delete on storage.objects to anon,authenticated;`);
+  for(const migration of ['0001_dashboard.sql','0003_task_context_and_materials.sql','0004_public_task_passports.sql'])
+   await db.exec(await readFile('supabase/migrations/'+migration,'utf8'));
+  const workspace='10000000-0000-4000-8000-000000000001',member='20000000-0000-4000-8000-000000000001',stranger='20000000-0000-4000-8000-000000000002';
+  const task={id:'task-one',title:'Design task',person:'Designer',status:'active',start:'',end:'2026-11-06',note:'Task note',context:'Brief',links:[{title:'Design',url:'https://example.org/brief',internal:'hidden'}],attachments:[{name:'private.pdf',path:workspace+'/'+member,type:'application/pdf',size:100}],milestones:[{date:'2026-11-06',label:'Review',internal:'hidden'}]};
+  const secret={...task,id:'task-two',title:'Other secret',context:'Other context'};
+  const state={tasks:[task,secret],trash:[]};
+  await db.query('insert into auth.users values($1),($2)',[member,stranger]);
+  await db.query('insert into public.dashboard_workspaces(id) values($1)',[workspace]);
+  await db.query('insert into public.dashboard_plans(workspace_id,revision,content) values($1,0,$2)',[workspace,{tasks:[],trash:[]}]);
+  await db.query('insert into public.dashboard_members values($1,$2)',[workspace,member]);
+  const as=async(role,id='')=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claim.role',$2,false)",[id,role]);await db.exec('set role '+role)};
+  const set=(id,enabled)=>db.query('select public.dashboard_task_share_set($1,$2,$3) as token',[workspace,id,enabled]);
+  const status=id=>db.query('select public.dashboard_task_share_status($1,$2) as token',[workspace,id]);
+  const read=token=>db.query('select public.dashboard_public_task($1) as task',[token]);
+  const save=(revision,content)=>db.query("select public.dashboard_save($1,$2,$3,'Changed')",[workspace,revision,content]);
+  await as('anon');
+  await assert.rejects(()=>set('task-one',true),/permission denied/);
+  await assert.rejects(()=>status('task-one'),/permission denied/);
+  await assert.rejects(()=>db.query('select * from public.dashboard_task_shares'),/permission denied/);
+  await assert.rejects(()=>db.query('select * from public.dashboard_plans'),/permission denied/);
+  await as('authenticated',stranger);await assert.rejects(()=>set('task-one',true),/Not a workspace member/);
+  await as('authenticated',member);
+  await assert.rejects(()=>set('task-one',true),/Task not found/);
+  await save(0,state);
+  const token=(await set('task-one',true)).rows[0].token;
+  assert.match(token,/^[0-9a-f-]{36}$/);
+  assert.equal((await status('task-one')).rows[0].token,token);
+  assert.equal((await set('task-one',true)).rows[0].token,token);
+  await as('anon');
+  const publicTask=(await read(token)).rows[0].task;
+  assert.equal(publicTask.title,'Design task');assert.equal(publicTask.context,'Brief');
+  assert.deepEqual(publicTask.links,[{title:'Design',url:'https://example.org/brief'}]);
+  assert.deepEqual(publicTask.milestones,[{date:'2026-11-06',label:'Review'}]);
+  assert.equal(JSON.stringify(publicTask).includes('private.pdf'),false);
+  assert.equal(JSON.stringify(publicTask).includes('hidden'),false);
+  assert.equal(JSON.stringify(publicTask).includes('Other secret'),false);
+  assert.equal((await read('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).rows[0].task,null);
+  await as('authenticated',member);
+  await set('task-one',false);await as('anon');assert.equal((await read(token)).rows[0].task,null);
+  await as('authenticated',member);const newToken=(await set('task-one',true)).rows[0].token;assert.notEqual(newToken,token);
+  await save(1,{tasks:[secret],trash:[{task,deletedAt:new Date().toISOString()}]});
+  await as('anon');assert.equal((await read(newToken)).rows[0].task,null);
+  await as('authenticated',member);await save(2,state);assert.equal((await status('task-one')).rows[0].token,null);
+ }finally{await db.close()}
+});

@@ -130,6 +130,8 @@ export function createBackend(config,clientFactory=createClient) {
   }
   return {
     api,
+    async getTaskShare(taskId){return rpc('dashboard_task_share_status',{p_task_id:taskId})},
+    async setTaskShare(taskId,enabled){return rpc('dashboard_task_share_set',{p_task_id:taskId,p_enabled:enabled})},
     async uploadAttachment(file){
       if(file.size>MAX_FILE_SIZE)fail('Файл больше 20 МБ');
       const started=epoch,path=config.workspaceId+'/'+crypto.randomUUID();
