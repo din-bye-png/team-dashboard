@@ -8,8 +8,8 @@ const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!isNaN(pa
 function valid(data){return Array.isArray(data)&&data.length<=500&&data.every(t=>t&&validMaterials(t)&&typeof t.id==='string'&&typeof t.title==='string'&&typeof t.person==='string'&&typeof t.note==='string'&&['active','blocked','waiting','done'].includes(t.status)&&(!t.start||validDate(t.start))&&(!t.end||validDate(t.end))&&(!t.start||!t.end||t.start<=t.end)&&Array.isArray(t.milestones)&&t.milestones.every(m=>validDate(m.date)&&typeof m.label==='string'))&&new Set(data.map(t=>t.id)).size===data.length}
 
 function toast(s){$('#toast').textContent=s;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),2500)}
-const PALETTE=[['#263b4a','#DDEEFF'],['#2c4131','#DDF4DE'],['#50382e','#FFE3D8'],['#4b422b','#FFF0B9']];
-const colors=t=>t.status==='blocked'?PALETTE[3]:PALETTE[[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%PALETTE.length];
+const PALETTE=['pink','violet','blue','lime','purple'];
+const colors=t=>{const name=PALETTE[[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%PALETTE.length];return [`var(--task-${name})`,`var(--task-${name}-soft)`,name==='lime'?'#102000':'#fff']};
 const statusLabel={active:'В работе',blocked:'На стопе',waiting:'Ожидаем вводных',done:'Готово'};
 const taskFilters=[
  {id:'all',label:'Всего задач',matches:()=>true},
@@ -17,6 +17,7 @@ const taskFilters=[
  {id:'undated',label:'Без срока',matches:t=>!t.end&&t.status!=='done'},
  {id:'blocked',label:'На стопе',matches:t=>t.status==='blocked'},
 ];
+const statIcons={all:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m7 12 3 3 7-8"/>',active:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',undated:'<path d="m3 7 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 17l9 5 9-5"/>',blocked:'<path d="M5 4v16M12 4v16M19 4v16"/>'};
 const DAYS=98;let calendarStart=day(rangeStart,-42),dayWidth=60;
 function updateRange(){ $('#range').textContent=`${fmt(rangeStart)} — ${fmt(day(rangeStart,13))} ${parse(rangeStart).getFullYear()}`; }
 function render(){
@@ -32,11 +33,11 @@ const personTasks=tasks.filter(t=>!selected||t.person===selected);
 const visible=personTasks.filter(taskFilters.find(filter=>filter.id===view).matches);
 const taskCount=tasks.length;
 $('#gantt').style.setProperty('--row-height',Math.max(48,($('.scroll').clientHeight-60)/Math.max(taskCount,9))+'px');
-$('#stats').innerHTML=taskFilters.map(filter=>`<button type="button" class="stat${view===filter.id?' is-selected':''}" data-task-filter="${filter.id}" aria-pressed="${view===filter.id}" aria-controls="gantt"><span>${filter.label}</span><strong>${personTasks.filter(filter.matches).length}</strong></button>`).join('');
+$('#stats').innerHTML=taskFilters.map(filter=>`<button type="button" class="stat${view===filter.id?' is-selected':''}" data-task-filter="${filter.id}" aria-pressed="${view===filter.id}" aria-controls="gantt"><span class="stat-caption"><svg viewBox="0 0 24 24" aria-hidden="true">${statIcons[filter.id]}</svg>${filter.label}</span><strong>${personTasks.filter(filter.matches).length}</strong></button>`).join('');
 const people=[...new Set(tasks.map(t=>t.person))];$('#person').innerHTML='<option value="">Вся команда</option>'+people.map(p=>`<option ${selected===p?'selected':''}>${esc(p)}</option>`).join('');
 updateRange();
-let dates=Array.from({length:DAYS},(_,i)=>day(calendarStart,i)),todayIndex=diff(TODAY,calendarStart);let html='<div class="grid-head"><div class="head-label">ЗАДАЧА / ОТВЕТСТВЕННЫЙ</div><div class="dates">'+dates.map(d=>`<div class="date ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString('ru-RU',{weekday:'short'})}</span></div>`).join('')+'</div></div>';
-for(const t of visible){let[c,bg]=colors(t),style=`--color:${c};--tint:${bg}`,start=t.start||BASE;let left=Math.max(0,diff(start,calendarStart)),right=Math.min(DAYS,diff(t.end,calendarStart)+1);let bar='';
+let dates=Array.from({length:DAYS},(_,i)=>day(calendarStart,i)),todayIndex=diff(TODAY,calendarStart);let html='<div class="grid-head"><div class="head-label">Задача / ответственный</div><div class="dates">'+dates.map(d=>`<div class="date ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString('ru-RU',{weekday:'short'})}</span></div>`).join('')+'</div></div>';
+for(const t of visible){let[c,bg,ink]=colors(t),style=`--color:${c};--tint:${bg};--bar-ink:${ink}`,start=t.start||BASE;let left=Math.max(0,diff(start,calendarStart)),right=Math.min(DAYS,diff(t.end,calendarStart)+1);let bar='';
 if(t.end&&right>left&&diff(start,calendarStart)<DAYS){const detail=t.status==='blocked'?'На стопе':fmt(t.end);const compact=(right-left)*dayWidth-10<150;bar=`<div class="bar ${t.status} ${compact?'compact':''}" style="left:calc(${left/DAYS*100}% + 5px);width:calc(${(right-left)/DAYS*100}% - 10px)" tabindex="0" role="button" aria-label="${esc(t.title)}: показать комментарий"><span class="bar-name">${esc(t.title)}</span><span class="bar-detail">${esc(detail)}</span>${diff(start,calendarStart)>=0?`<span class="bar-resize-handle resize-start" data-resize-edge="start" role="slider" tabindex="0" aria-label="Начало задачи ${esc(t.title)}" aria-valuemin="${diff(calendarStart,'1970-01-01')}" aria-valuemax="${diff(t.end,'1970-01-01')}" aria-valuenow="${diff(start,'1970-01-01')}" aria-valuetext="${esc(fmt(start))}" title="Потяните, чтобы изменить начало"></span>`:''}${diff(t.end,calendarStart)<DAYS?`<span class="bar-resize-handle resize-end" data-resize-edge="end" role="slider" tabindex="0" aria-label="Дедлайн задачи ${esc(t.title)}" aria-valuemin="${diff(start,'1970-01-01')}" aria-valuemax="${diff(day(calendarStart,DAYS-1),'1970-01-01')}" aria-valuenow="${diff(t.end,'1970-01-01')}" aria-valuetext="${esc(fmt(t.end))}" title="Потяните, чтобы изменить дедлайн"></span>`:''}</div>`}
 
 if(!t.end)bar=`<span class="undated" tabindex="0" role="button" aria-label="${esc(t.title)}: показать комментарий">${t.status==='waiting'?'↩ Ждём обратную связь':'··· Дедлайн не указан'}</span>`;
