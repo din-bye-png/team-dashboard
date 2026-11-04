@@ -17,7 +17,7 @@ const taskFilters=[
  {id:'undated',label:'Без срока',matches:t=>!t.end&&t.status!=='done'},
  {id:'blocked',label:'На стопе',matches:t=>t.status==='blocked'},
 ];
-const statIcons={all:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m7 12 3 3 7-8"/>',active:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',undated:'<path d="m3 7 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 17l9 5 9-5"/>',blocked:'<path d="M5 4v16M12 4v16M19 4v16"/>'};
+const statIcons={all:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h.01M11 8h5M8 12h.01M11 12h5M8 16h.01M11 16h5"/>',active:'<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>',undated:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-11 4 4 4m0-4-4 4"/>',blocked:'<circle cx="12" cy="12" r="9"/><path d="M9 8v8m6-8v8"/>'};
 const DAYS=98;let calendarStart=day(rangeStart,-42),dayWidth=60;
 function updateRange(){ $('#range').textContent=`${fmt(rangeStart)} — ${fmt(day(rangeStart,13))} ${parse(rangeStart).getFullYear()}`; }
 function render(){
