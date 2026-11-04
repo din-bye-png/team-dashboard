@@ -13,8 +13,7 @@
  apply();system.addEventListener('change',()=>{if(preference==='system')apply()});
  window.addEventListener('storage',e=>{if(e.key===key||e.key===null){preference=modes.includes(e.newValue)?e.newValue:'system';apply()}});
  document.addEventListener('DOMContentLoaded',()=>{
-  const picker=document.querySelector('.theme-picker'),auth=document.querySelector('.auth-screen');
-  if(picker&&auth){const copy=picker.cloneNode(true);copy.classList.add('auth-theme-picker');auth.append(copy)}apply();
+  apply();
   document.addEventListener('click',e=>{
    const b=e.target.closest('[data-theme-choice]');
    if(b){preference=b.dataset.themeChoice;try{localStorage.setItem(key,preference)}catch{}apply();const menu=b.closest('details');menu.open=false;menu.querySelector('summary').focus()}

@@ -13,7 +13,7 @@ async function api(path,body){
  if(started!==authEpoch)throw new Error('Сеанс завершён');
  return result;
 }
-function applyPlan(plan){if(!plan||plan.revision<revision)return;if(taskReorder)cancelTaskReorder();const changed=!ready||revision!==plan.revision;tasks=plan.tasks;revision=plan.revision;ready=true;if(changed)render();controls();status('Общий план · версия '+revision);queueMicrotask(openLinkedTask);}
+function applyPlan(plan){if(!plan||plan.revision<revision)return;if(taskReorder)cancelTaskReorder();const changed=!ready||revision!==plan.revision;tasks=plan.tasks;revision=plan.revision;ready=true;if(changed)render();controls();status('');queueMicrotask(openLinkedTask);}
 async function refresh(){
  if(polling||saving||uploadingMaterials||taskReorder||taskResize)return;polling=true;
  try{const {plan}=await api('plan');if(plan){const changed=plan.revision!==revision;applyPlan(plan);if(changed&&$('#editor').open){$('#editWarning').textContent='План обновился у коллеги. Ваш текст остаётся в форме; при сохранении проверим конфликт.';$('#editWarning').hidden=false}queueFile()}}

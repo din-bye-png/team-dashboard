@@ -3,7 +3,7 @@ import path from 'node:path';
 const permittedRoots=new Set(['public','scripts','tests','supabase','.github','dist']);
 const permittedFiles=new Set(['README.md','SECURITY.md','.gitignore','package.json','package-lock.json']);
 const forbiddenFiles=/\.(?:png|jpe?g|webp|pdf|csv|zip|sqlite|db|pem|key|map)$/i;
-const reviewedImages=new Set(['public/favicon.png','public/apple-touch-icon.png','dist/favicon.png','dist/apple-touch-icon.png','public/team-logo.png','dist/team-logo.png']);
+const reviewedImages=new Set(['public/favicon.png','public/apple-touch-icon.png','dist/favicon.png','dist/apple-touch-icon.png','public/team-logo.png','dist/team-logo.png','public/assets/spice-girls.png','dist/assets/spice-girls.png']);
 const patterns=[
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/,
