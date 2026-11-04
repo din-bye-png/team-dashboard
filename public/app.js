@@ -30,7 +30,7 @@ $('#gantt').style.setProperty('--days',DAYS);
 const selected=$('#person').value;
 const personTasks=tasks.filter(t=>!selected||t.person===selected);
 const visible=personTasks.filter(taskFilters.find(filter=>filter.id===view).matches);
-const taskCount=visible.length;
+const taskCount=tasks.length;
 $('#gantt').style.setProperty('--row-height',Math.max(48,($('.scroll').clientHeight-60)/Math.max(taskCount,9))+'px');
 $('#stats').innerHTML=taskFilters.map(filter=>`<button type="button" class="stat${view===filter.id?' is-selected':''}" data-task-filter="${filter.id}" aria-pressed="${view===filter.id}" aria-controls="gantt"><span>${filter.label}</span><strong>${personTasks.filter(filter.matches).length}</strong></button>`).join('');
 const people=[...new Set(tasks.map(t=>t.person))];$('#person').innerHTML='<option value="">Вся команда</option>'+people.map(p=>`<option ${selected===p?'selected':''}>${esc(p)}</option>`).join('');
