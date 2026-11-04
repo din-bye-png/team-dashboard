@@ -85,6 +85,40 @@ $('#copySummary').onclick=()=>{
  copyText([f.title.value,f.person.value+' · '+statusLabel[f.status.value],f.end.value?'Дедлайн: '+f.end.value:'',f.context.value,f.note.value,...draftLinks.filter(link=>!link.removed).map(l=>l.title+': '+l.url),...draftAttachments.filter(file=>!file.removed).map(a=>'Файл: '+a.name),...milestones].filter(Boolean).join('\n\n'));
 };
 $('#copyTaskLink').onclick=()=>{const url=new URL(location.href);url.hash='task='+encodeURIComponent(editing);copyText(url.href)};
+let shareToken=null,shareBusy=false,shareRequest=0;
+function publicShareURL(){const url=new URL('share.html',location.href);url.hash='token='+shareToken;return url.href}
+function renderTaskShare(){
+ const published=!!shareToken;
+ $('#shareToggle').textContent=published?'Отключить ссылку':'Создать ссылку';
+ $('#shareToggle').disabled=shareBusy||saving||uploadingMaterials;
+ $('#shareCopy').hidden=!published;$('#shareOpen').hidden=!published;
+ if(published)$('#shareOpen').href=publicShareURL();else $('#shareOpen').removeAttribute('href');
+}
+async function loadTaskShare(id){
+ const request=++shareRequest;shareToken=null;shareBusy=!!id;$('#taskShare').hidden=!id;
+ if(!id)return;
+ $('#shareStatus').textContent='Проверяем доступ к паспорту…';renderTaskShare();
+ try{
+  const token=await backend.getTaskShare(id);
+  if(request!==shareRequest||editing!==id||!$('#editor').open)return;
+  shareToken=token;$('#shareStatus').textContent=token?'Ссылка активна. Страница обновляется после сохранения задачи.':'Ссылка ещё не создана. Опубликуйте задачу, когда контекст будет готов.';
+ }catch(error){if(request===shareRequest)$('#shareStatus').textContent=error.message}
+ finally{if(request===shareRequest){shareBusy=false;renderTaskShare()}}
+}
+$('#shareToggle').onclick=async()=>{
+ if(shareBusy||saving||uploadingMaterials||!ready)return;
+ const id=editing,enabled=!shareToken;
+ if(!enabled&&!confirm('Отключить публичную ссылку? Старый адрес перестанет открываться.'))return;
+ const request=++shareRequest;shareBusy=true;renderTaskShare();
+ try{
+  const token=await backend.setTaskShare(id,enabled);
+  if(request!==shareRequest||editing!==id||!$('#editor').open)return;
+  shareToken=token;$('#shareStatus').textContent=token?'Ссылка активна. Несохранённые изменения появятся после сохранения задачи.':'Ссылка отключена. Старый адрес больше не работает.';
+  toast(token?'Паспорт опубликован':'Публичная ссылка отключена');
+ }catch(error){if(request===shareRequest){$('#shareStatus').textContent=error.message;toast(error.message)}}
+ finally{if(request===shareRequest){shareBusy=false;renderTaskShare()}}
+};
+$('#shareCopy').onclick=()=>{if(shareToken)copyText(publicShareURL())};
 $('#editor').addEventListener('cancel',e=>{if(saving||uploadingMaterials)e.preventDefault()});
 // Dismiss only when both the press and click are outside the dialog.
 // Selecting text inside and releasing over the backdrop keeps the draft open.
@@ -93,7 +127,7 @@ function outsideTaskDialog(e){const r=$('#editor').getBoundingClientRect();retur
 $('#editor').addEventListener('pointerdown',e=>{taskBackdropPress=e.button===0&&e.target===$('#editor')&&outsideTaskDialog(e)});
 $('#editor').addEventListener('pointercancel',()=>{taskBackdropPress=false});
 $('#editor').addEventListener('click',e=>{const dismiss=taskBackdropPress&&e.target===$('#editor')&&outsideTaskDialog(e);taskBackdropPress=false;if(dismiss)$('#close').click()});
-$('#editor').addEventListener('close',()=>resetTaskContext());
+$('#editor').addEventListener('close',()=>{shareRequest++;shareToken=null;$('#taskShare').hidden=true;resetTaskContext()});
 let handledTaskHash='';
 function openLinkedTask(){if(!ready||!location.hash.startsWith('#task=')||handledTaskHash===location.hash)return;handledTaskHash=location.hash;let id;try{id=decodeURIComponent(location.hash.slice(6))}catch{return}if(tasks.some(t=>t.id===id))edit(id);else toast('Задача не найдена в текущем плане')}
 window.addEventListener('hashchange',()=>{handledTaskHash='';openLinkedTask()});
