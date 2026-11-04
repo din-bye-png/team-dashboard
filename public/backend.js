@@ -81,8 +81,19 @@ export function prepareChange(plan, body, restored, now=new Date().toISOString()
 
 export function createBackend(config,clientFactory=createClient) {
   if(!configured(config))return null;
+  // Never fall back to localStorage: credentials belong to this tab only.
+  let retainSession=true;
+  const memory=new Map();
+  const storage={
+    getItem(key){if(!retainSession)return memory.get(key)??null;try{return globalThis.sessionStorage?.getItem(key)??memory.get(key)??null;}catch{return memory.get(key)??null;}},
+    setItem(key,value){memory.set(key,value);if(!retainSession)return;try{globalThis.sessionStorage?.setItem(key,value);}catch{}},
+    removeItem(key){memory.delete(key);try{globalThis.sessionStorage?.removeItem(key);}catch{}},
+  };
+  const tabKey='team-dashboard-auth-tab:'+config.workspaceId;
+  let tabId=storage.getItem(tabKey);
+  if(!tabId){tabId=crypto.randomUUID();storage.setItem(tabKey,tabId);}
   const client=clientFactory(config.supabaseUrl,config.supabasePublishableKey,{
-    auth:{persistSession:false,detectSessionInUrl:false,autoRefreshToken:true},
+    auth:{persistSession:true,storage,storageKey:'team-dashboard-auth:'+config.workspaceId+':'+tabId,detectSessionInUrl:false,autoRefreshToken:true},
   });
   let current=null,epoch=0,passwordSetup=false;
   async function rpc(name,params) {
@@ -149,6 +160,9 @@ export function createBackend(config,clientFactory=createClient) {
     },
     async acceptAuthLink(link){
       passwordSetup=false;
+      // Invitation/recovery credentials must not survive a reload before setup.
+      retainSession=false;
+      await client.auth.signOut({scope:'local'});
       if(link.error)fail(link.error);
       const {error}=await client.auth.setSession({access_token:link.access_token,refresh_token:link.refresh_token});
       if(error){await client.auth.signOut({scope:'local'});fail(expiredMessage);}
@@ -164,7 +178,16 @@ export function createBackend(config,clientFactory=createClient) {
       if(error)fail(error.code==='weak_password'?'Пароль слишком простой. Используйте более сложный пароль.':'Не удалось сохранить пароль. Проверьте соединение и попробуйте ещё раз.');
       passwordSetup=false;
     },
+    async restoreSession(){
+      const {data,error}=await client.auth.getSession();
+      if(error)throw error;
+      if(!data?.session)return false;
+      const {data:userData,error:userError}=await client.auth.getUser();
+      if(userError||!userData?.user){await client.auth.signOut({scope:'local'});return false;}
+      return true;
+    },
     async signIn(email,password){
+      retainSession=true;
       const {error}=await client.auth.signInWithPassword({email,password});
       if(error)fail('Не удалось войти. Проверьте данные и попробуйте ещё раз.');
     },

@@ -170,7 +170,19 @@ async function initializeAuthLink(){
   delete authLink.access_token;delete authLink.refresh_token;button.disabled=false;
  }
 }
-initializeAuthLink();
+async function initializeAuth(){
+ if(authLink){await initializeAuthLink();return;}
+ if(!backend)return;
+ const button=$('#authForm').querySelector('button');button.disabled=true;
+ try{
+  if(await backend.restoreSession()){
+   if(await boot()){$('#authScreen').hidden=true;$('#dashboard').hidden=false;render();}
+   else $('#authError').textContent='Не удалось загрузить план. Проверьте соединение и обновите страницу.';
+  }
+ }catch{$('#authError').textContent='Не удалось восстановить вход. Проверьте соединение или войдите снова.';}
+ finally{button.disabled=false;}
+}
+initializeAuth();
 setInterval(()=>{if(ready)refresh();},10000);
 window.addEventListener('focus',()=>{if(ready){refresh();queueFile();}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ready){refresh();queueFile();}});

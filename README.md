@@ -14,7 +14,11 @@ npm run audit:public
 npm run preview
 ```
 
-The preview binds only to localhost. Without configuration the page shows a locked sign-in screen and makes no backend requests. There is no demo-data fallback and no automatic initialization from browser storage.
+The preview binds only to localhost. Without configuration the page shows a locked sign-in screen and makes no backend requests. There is no demo-data fallback and no task data is loaded from browser storage.
+
+## Appearance
+
+The top-right theme button offers Light, Dark and System modes; System is the default and follows live OS appearance changes. The sign-in screen uses the fixed black and pink Figma design with a white form. Only the appearance preference (`team-dashboard-theme`) is saved to localStorage, and changes synchronize between tabs. If browser storage is unavailable, switching still works for the current page. `public/theme.js` resolves the theme before CSS loads. The supplied vector logo is in `public/team-logo.svg`; CSS adapts its colour to each theme.
 
 ## Supabase setup
 
@@ -66,7 +70,9 @@ The application uses an explicitly assigned workspace. `dashboard_members` links
 
 Anonymous visitors have no table access. Authenticated nonmembers have no access to other workspaces. Membership cannot be self-assigned. Browser writes go through a membership-checked RPC with row locking, server-side JSON validation and revision comparison; snapshots and writes are atomic. The browser cannot write tables directly or invoke admin import/backup functions. Cleanup of old history and trash runs during a successful write after 30 days; the latest revision remains.
 
-Invitation and recovery links open a password creation form. Expired or used links show a request for a fresh email. The page removes Auth tokens from the address before contacting Supabase, verifies the session, and accepts a new password only in the invitation/recovery flow. After saving, the user signs in with that password; workspace membership is still assigned separately by an administrator. Reloading before setting the password requires a fresh link.\n\nSessions use the official Supabase SDK with in-memory session storage and automatic token refresh; persistent storage and automatic URL-session detection are disabled. Email-link sessions are handled explicitly. Tokens and tasks are not saved in localStorage or IndexedDB. Reloading the page requires signing in again. Sign-out clears displayed tasks, forms, dialogs, cached plan and the selected local backup file. Existing access JWTs can remain valid until expiration; use appropriate token lifetime and administrative revocation practices for the deployment.
+Invitation and recovery links open a password creation form. Expired or used links show a request for a fresh email. The page removes Auth tokens from the address before contacting Supabase, verifies the session, and accepts a new password only in the invitation/recovery flow. After saving, the user signs in with that password; workspace membership is still assigned separately by an administrator. Reloading before setting the password requires a fresh link.
+
+Sessions use the official Supabase SDK with tab-scoped sessionStorage and automatic token refresh; automatic URL-session detection is disabled. If storage is unavailable, sessions fall back to memory. Email-link sessions are handled explicitly. Tokens and tasks are not saved in localStorage or IndexedDB. Reloading restores and verifies the session before loading the plan. Closing the tab normally clears the session; browser restore/reopen features may restore sessionStorage too. Invitation/recovery credentials remain in memory until password setup is complete. Sign-out clears displayed tasks, forms, dialogs, cached plan and the selected local backup file. Existing access JWTs can remain valid until expiration; use appropriate token lifetime and administrative revocation practices for the deployment.
 
 JSON export and a user-selected local backup file remain explicit optional features. Selecting a file stores its handle only in memory for that session. These private downloads must stay outside the public repository. Treat them as confidential copies of Supabase data.
 
@@ -85,3 +91,9 @@ Scheduled backlog backups are not part of this public repository and must not be
 ## Checks
 
 Tests exercise the migrations in an isolated Postgres-compatible PGlite instance with Auth roles, anonymous and nonmember denial, membership escalation rejection, direct-write rejection, revision conflicts, invalid state, atomic snapshot failure and admin-only import. They do not substitute for checks against the configured live Supabase project with two real accounts. The public-file audit scans the source and built bundle for recognized credentials, former hosting IDs and disallowed export/media files; it is a safeguard, not a guarantee against every possible disclosure.
+
+## Branded sign-in page
+
+The local sign-in design follows Figma frame `31:856`. Supplied graphics and the Lebowski heading font live in `public/assets/` and are copied into `dist/assets/` during build. The Telegram contact opens `https://t.me/nikitagrosu`. Existing Supabase sign-in and password setup remain connected.
+
+Run `npm run build` then `PORT=4175 npm run preview` for a separate local preview. Transfer the contents of `dist/` when ready to release.

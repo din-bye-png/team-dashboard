@@ -39,7 +39,7 @@ test('verified invite and recovery allow password setup once; no membership is a
     await assert.rejects(backend.setPassword('short'));
     await backend.setPassword('password-example');
     await assert.rejects(backend.setPassword('password-example'));
-    assert.deepEqual(calls.map(c=>c[0]),['session','password']);
+    assert.deepEqual(calls.map(c=>c[0]),['out','session','password']);
   }
 });
 test('invalid or unverified sessions cannot change passwords',async()=>{
