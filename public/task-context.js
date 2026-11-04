@@ -86,6 +86,13 @@ $('#copySummary').onclick=()=>{
 };
 $('#copyTaskLink').onclick=()=>{const url=new URL(location.href);url.hash='task='+encodeURIComponent(editing);copyText(url.href)};
 $('#editor').addEventListener('cancel',e=>{if(saving||uploadingMaterials)e.preventDefault()});
+// Dismiss only when both the press and click are outside the dialog.
+// Selecting text inside and releasing over the backdrop keeps the draft open.
+let taskBackdropPress=false;
+function outsideTaskDialog(e){const r=$('#editor').getBoundingClientRect();return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom}
+$('#editor').addEventListener('pointerdown',e=>{taskBackdropPress=e.button===0&&e.target===$('#editor')&&outsideTaskDialog(e)});
+$('#editor').addEventListener('pointercancel',()=>{taskBackdropPress=false});
+$('#editor').addEventListener('click',e=>{const dismiss=taskBackdropPress&&e.target===$('#editor')&&outsideTaskDialog(e);taskBackdropPress=false;if(dismiss)$('#close').click()});
 $('#editor').addEventListener('close',()=>resetTaskContext());
 let handledTaskHash='';
 function openLinkedTask(){if(!ready||!location.hash.startsWith('#task=')||handledTaskHash===location.hash)return;handledTaskHash=location.hash;let id;try{id=decodeURIComponent(location.hash.slice(6))}catch{return}if(tasks.some(t=>t.id===id))edit(id);else toast('Задача не найдена в текущем плане')}
