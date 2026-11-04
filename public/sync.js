@@ -3,7 +3,7 @@ let fileHandle=null,fileRevision=-1,fileQueue=Promise.resolve();
 const syncStatus=$('#syncStatus');
 function status(message,error=false){syncStatus.textContent=message;syncStatus.classList.toggle('error-text',error)}
 function controls(){ $('#add').disabled=!ready||saving||uploadingMaterials;$('#import').disabled=!ready||saving||uploadingMaterials;$('#form').querySelectorAll('button').forEach(b=>b.disabled=saving||uploadingMaterials); }
-let authEpoch=0;
+let authEpoch=0,authInitializing=true;
 const authLink=consumeAuthLink(window.location,window.history);
 const backend=createBackend(config);
 async function api(path,body){
@@ -109,7 +109,7 @@ function clearPrivateView(){
  for(const dialog of document.querySelectorAll('dialog'))if(dialog.open)dialog.close();
  $('#form').reset();resetTaskContext();handledTaskHash='';$('#milestones').replaceChildren();$('#editWarning').textContent='';
  for(const id of ['trashList','versionList','versionPreview'])$('#'+id).replaceChildren();
- $('#person').value='';render();controls();$('#dashboard').hidden=true;$('#authScreen').hidden=false;
+ $('#person').value='';render();controls();$('#dashboard').hidden=true;$('#authScreen').hidden=authInitializing;
  $('#authForm').reset();$('#toast').textContent='';fileStatus('Файл не выбран');
  $('#passwordForm').reset();$('#passwordForm').hidden=true;$('#authForm').hidden=false;$('#passwordError').textContent='';
 }
@@ -171,16 +171,19 @@ async function initializeAuthLink(){
  }
 }
 async function initializeAuth(){
- if(authLink){await initializeAuthLink();return;}
- if(!backend)return;
  const button=$('#authForm').querySelector('button');button.disabled=true;
  try{
+  if(authLink){await initializeAuthLink();return;}
+  if(!backend)return;
   if(await backend.restoreSession()){
    if(await boot()){$('#authScreen').hidden=true;$('#dashboard').hidden=false;render();}
    else $('#authError').textContent='Не удалось загрузить план. Проверьте соединение и обновите страницу.';
   }
  }catch{$('#authError').textContent='Не удалось восстановить вход. Проверьте соединение или войдите снова.';}
- finally{button.disabled=false;}
+ finally{
+  button.disabled=!backend;authInitializing=false;
+  $('#authScreen').hidden=!$('#dashboard').hidden;
+ }
 }
 initializeAuth();
 setInterval(()=>{if(ready)refresh();},10000);
