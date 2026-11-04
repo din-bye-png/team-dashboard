@@ -8,8 +8,8 @@ const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!isNaN(pa
 function valid(data){return Array.isArray(data)&&data.length<=500&&data.every(t=>t&&validMaterials(t)&&typeof t.id==='string'&&typeof t.title==='string'&&typeof t.person==='string'&&typeof t.note==='string'&&['active','blocked','waiting','done'].includes(t.status)&&(!t.start||validDate(t.start))&&(!t.end||validDate(t.end))&&(!t.start||!t.end||t.start<=t.end)&&Array.isArray(t.milestones)&&t.milestones.every(m=>validDate(m.date)&&typeof m.label==='string'))&&new Set(data.map(t=>t.id)).size===data.length}
 
 function toast(s){$('#toast').textContent=s;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),2500)}
-const PALETTE=['pink','violet','blue','lime','purple'];
-const colors=t=>{const name=PALETTE[[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%PALETTE.length];return [`var(--task-${name})`,`var(--task-${name}-soft)`,name==='lime'?'#102000':'#fff']};
+const PALETTE=['yellow','blue','pink','green','coral','violet'];
+const colors=t=>{const name=PALETTE[[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%PALETTE.length];return [`var(--task-${name})`,`var(--task-${name}-soft)`,'#17191c']};
 const statusLabel={active:'В работе',blocked:'На стопе',waiting:'Ожидаем вводных',done:'Готово'};
 const taskFilters=[
  {id:'all',label:'Всего задач',matches:()=>true},
@@ -48,7 +48,7 @@ $('#gantt').innerHTML=html+(visible.length?'':'<p style="padding:30px;color:#aaa
 $('.scroll').scrollLeft=42*dayWidth;$('#gantt').style.setProperty('--calendar-offset',$('.scroll').scrollLeft+'px');
 const events=tasks.filter(t=>t.status!=='done'&&(!selected||t.person===selected)).flatMap(t=>[...t.milestones,...(t.end&&!t.milestones.some(m=>m.date===t.end)?[{date:t.end,label:'Дедлайн'}]:[])].map(m=>({...m,task:t}))).filter(m=>m.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
 let lastDate='';
-$('#radar').innerHTML=events.length?events.map(e=>{const[c,bg]=colors(e.task);let heading=e.date!==lastDate?`<h3 class="radar-date">${e.date===TODAY?'Сегодня · ':''}${parse(e.date).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}</h3>`:'';lastDate=e.date;return heading+`<button class="event" title="${esc(e.label)} · ${esc(e.task.title)}" data-edit="${esc(e.task.id)}" style="--tint:${bg};--color:${c}"><span class="event-flag" aria-hidden="true">⚑</span><span class="event-info">${esc(e.label)}<small>${esc(e.task.title)} · ${esc(e.task.person)}</small></span></button>`}).join(''):'<p class="small">Предстоящих событий нет.</p>';
+$('#radar').innerHTML=events.length?events.map(e=>{const[c,bg,ink]=colors(e.task);let heading=e.date!==lastDate?`<h3 class="radar-date">${e.date===TODAY?'Сегодня · ':''}${parse(e.date).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}</h3>`:'';lastDate=e.date;return heading+`<button class="event" title="${esc(e.label)} · ${esc(e.task.title)}" data-edit="${esc(e.task.id)}" style="--tint:${bg};--color:${c};--bar-ink:${ink}"><span class="event-flag" aria-hidden="true">⚑</span><span class="event-info">${esc(e.label)}<small>${esc(e.task.title)} · ${esc(e.task.person)}</small></span></button>`}).join(''):'<p class="small">Предстоящих событий нет.</p>';
 updateLinkedTask();
 
 }
