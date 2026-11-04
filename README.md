@@ -52,6 +52,14 @@ After importing, verify task/trash counts, revision and matching history against
 
 ## Data and authorization
 
+### Task context and materials
+
+Apply `supabase/migrations/0003_task_context_and_materials.sql` before deploying the task-card update. It adds validation for optional context, links and attachment metadata, and creates the private `task-attachments` bucket. Current workspace members can upload and download files in their workspace folder; anonymous visitors and nonmembers have no access. Files are limited to 20 MiB each, 20 per task; links are limited to 30. The existing plan JSON size limit still applies to text and metadata.
+
+The task card has editable context and materials on the left and settings/checkpoints on the right. Icons distinguish Figma, documents, folders, PDF, images, spreadsheets, archives and other files. Attachments upload when saving, followed by the usual revision-checked plan save. Failed saves retain the draft and uploaded paths for retry. Cancelling before save does not upload files. Unlinking a saved file removes its task reference; the object is retained so history and trash can still restore it. Uploads followed by an abandoned/failed plan save can leave unreferenced objects; cleanup must account for current tasks, trash and retained versions.
+
+JSON backups include context, links and attachment metadata, **not attachment bytes**. File objects need a separate Storage backup; restoring JSON into another project does not transfer those objects. A `#task=…` URL opens the task after sign-in. Existing tasks without the new fields remain compatible.
+
 The application uses an explicitly assigned workspace. `dashboard_members` links that workspace to Supabase Auth users; members can edit the shared plan. `dashboard_plans` stores the current ordered tasks and trash as JSONB. `dashboard_versions` stores snapshots with server-generated timestamps and authenticated authors.
 
 Anonymous visitors have no table access. Authenticated nonmembers have no access to other workspaces. Membership cannot be self-assigned. Browser writes go through a membership-checked RPC with row locking, server-side JSON validation and revision comparison; snapshots and writes are atomic. The browser cannot write tables directly or invoke admin import/backup functions. Cleanup of old history and trash runs during a successful write after 30 days; the latest revision remains.

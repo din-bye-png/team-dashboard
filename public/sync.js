@@ -2,7 +2,7 @@ let revision=0,editRevision=0,ready=false,saving=false,polling=false,archiveRevi
 let fileHandle=null,fileRevision=-1,fileQueue=Promise.resolve();
 const syncStatus=$('#syncStatus');
 function status(message,error=false){syncStatus.textContent=message;syncStatus.classList.toggle('error-text',error)}
-function controls(){ $('#add').disabled=!ready||saving;$('#import').disabled=!ready||saving;$('#form').querySelectorAll('button').forEach(b=>b.disabled=saving); }
+function controls(){ $('#add').disabled=!ready||saving||uploadingMaterials;$('#import').disabled=!ready||saving||uploadingMaterials;$('#form').querySelectorAll('button').forEach(b=>b.disabled=saving||uploadingMaterials); }
 let authEpoch=0;
 const authLink=consumeAuthLink(window.location,window.history);
 const backend=createBackend(config);
@@ -13,9 +13,9 @@ async function api(path,body){
  if(started!==authEpoch)throw new Error('Сеанс завершён');
  return result;
 }
-function applyPlan(plan){if(!plan||plan.revision<revision)return;if(taskReorder)cancelTaskReorder();const changed=!ready||revision!==plan.revision;tasks=plan.tasks;revision=plan.revision;ready=true;if(changed)render();controls();status('Общий план · версия '+revision);}
+function applyPlan(plan){if(!plan||plan.revision<revision)return;if(taskReorder)cancelTaskReorder();const changed=!ready||revision!==plan.revision;tasks=plan.tasks;revision=plan.revision;ready=true;if(changed)render();controls();status('Общий план · версия '+revision);queueMicrotask(openLinkedTask);}
 async function refresh(){
- if(polling||saving||taskReorder)return;polling=true;
+ if(polling||saving||uploadingMaterials||taskReorder||taskResize)return;polling=true;
  try{const {plan}=await api('plan');if(plan){const changed=plan.revision!==revision;applyPlan(plan);if(changed&&$('#editor').open){$('#editWarning').textContent='План обновился у коллеги. Ваш текст остаётся в форме; при сохранении проверим конфликт.';$('#editWarning').hidden=false}queueFile()}}
  catch(error){status(error.message||'Нет связи с сервером',true)}finally{polling=false}
 }
@@ -33,12 +33,17 @@ async function change(action,payload={},baseRevision=revision){
  }finally{saving=false;controls()}
 }
 $('#form').onsubmit=async e=>{
- e.preventDefault();if(!ready||saving)return;
+ e.preventDefault();if(!ready||saving||uploadingMaterials)return;
  const f=e.target.elements;
  if(f.start.value&&f.end.value&&f.start.value>f.end.value){toast('Дедлайн должен быть не раньше начала');return}
- const task={id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:f.person.value.trim()||'Не назначен',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.children[0].value,label:row.children[1].value.trim()}))};
+ if(!$('#linkComposer').hidden&&($('#linkTitle').value.trim()||$('#linkUrl').value.trim())){if(!addDraftLink())return}
+ uploadingMaterials=true;controls();$('#saveTask').textContent='Сохраняем…';
+ try{
+ const attachments=await uploadTaskAttachments();
+ const task={context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:f.person.value.trim()||'Не назначен',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.children[0].value,label:row.children[1].value.trim()}))};
  if(!task.title)return;
  if(await change('upsert',{task},editRevision))$('#editor').close();
+ }catch(error){toast(error.message)}finally{uploadingMaterials=false;controls();$('#saveTask').textContent='Сохранить'}
 };
 $('#delete').onclick=async()=>{if(confirm('Переместить задачу в корзину на 30 дней?')&&await change('delete',{id:editing},editRevision))$('#editor').close()};
 function download(data,name){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -99,10 +104,10 @@ async function boot(){
  catch(error){ready=false;controls();status(error.message,true);return false;}
 }
 function clearPrivateView(){
- authEpoch++;ready=false;revision=0;editRevision=0;archiveRevision=0;tasks=[];editing=null;
- fileHandle=null;fileRevision=-1;cancelTaskReorder();hideFlagTooltip();flagTooltip.innerHTML='';
+ authEpoch++;ready=false;revision=0;editRevision=0;archiveRevision=0;tasks=[];editing=null;view='all';
+ fileHandle=null;fileRevision=-1;cancelTaskReorder();cancelTaskResize();hideFlagTooltip();flagTooltip.innerHTML='';
  for(const dialog of document.querySelectorAll('dialog'))if(dialog.open)dialog.close();
- $('#form').reset();$('#milestones').replaceChildren();$('#editWarning').textContent='';
+ $('#form').reset();resetTaskContext();handledTaskHash='';$('#milestones').replaceChildren();$('#editWarning').textContent='';
  for(const id of ['trashList','versionList','versionPreview'])$('#'+id).replaceChildren();
  $('#person').value='';render();controls();$('#dashboard').hidden=true;$('#authScreen').hidden=false;
  $('#authForm').reset();$('#toast').textContent='';fileStatus('Файл не выбран');
@@ -169,4 +174,4 @@ initializeAuthLink();
 setInterval(()=>{if(ready)refresh();},10000);
 window.addEventListener('focus',()=>{if(ready){refresh();queueFile();}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ready){refresh();queueFile();}});
-window.addEventListener('beforeunload',event=>{if(saving){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(saving||uploadingMaterials){event.preventDefault();event.returnValue='';}});

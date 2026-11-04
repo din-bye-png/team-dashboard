@@ -1,5 +1,6 @@
 import {createClient} from '@supabase/supabase-js';
 import {expiredMessage} from './auth-link.js';
+import {validMaterials,MAX_FILE_SIZE} from './task-materials.js';
 
 export function configured(config) {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(config.supabaseUrl)
@@ -18,7 +19,7 @@ export function validTask(t) {
     && text(t.person,200)&&text(t.note,10000)&&['active','blocked','waiting','done'].includes(t.status)
     && text(t.start,10)&&text(t.end,10)&&(!t.start||validDate(t.start))&&(!t.end||validDate(t.end))
     && (!t.start||!t.end||t.start<=t.end)&&Array.isArray(t.milestones)&&t.milestones.length<=100
-    && t.milestones.every(m=>m&&validDate(m.date)&&text(m.label,500));
+    && t.milestones.every(m=>m&&validDate(m.date)&&text(m.label,500))&&validMaterials(t);
 }
 export function validState(state) {
   return !!state && Array.isArray(state.tasks)&&state.tasks.length<=500&&state.tasks.every(validTask)
@@ -129,6 +130,21 @@ export function createBackend(config,clientFactory=createClient) {
   }
   return {
     api,
+    async uploadAttachment(file){
+      if(file.size>MAX_FILE_SIZE)fail('Файл больше 20 МБ');
+      const started=epoch,path=config.workspaceId+'/'+crypto.randomUUID();
+      const {error}=await client.storage.from('task-attachments').upload(path,file,{contentType:'application/octet-stream',upsert:false});
+      if(started!==epoch)fail('Сеанс завершён');
+      if(error)fail('Не удалось загрузить файл. Проверьте соединение и настройку хранилища.');
+      return path;
+    },
+    async downloadAttachment(path){
+      if(!path.startsWith(config.workspaceId+'/'))fail('Файл из другого рабочего пространства');
+      const started=epoch,{data,error}=await client.storage.from('task-attachments').download(path);
+      if(started!==epoch)fail('Сеанс завершён');
+      if(error)fail('Не удалось скачать файл. Проверьте соединение и доступ.');
+      return data;
+    },
     async acceptAuthLink(link){
       passwordSetup=false;
       if(link.error)fail(link.error);
