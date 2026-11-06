@@ -185,9 +185,10 @@ textarea:focus-visible, .scroll:focus-visible, a:focus-visible,
 .event-info { font-size: 13px; line-height: 18px; white-space: normal; overflow-wrap: anywhere; color: var(--ink); }
 .event-info small { font-size: 12px; line-height: 17px; white-space: normal; color: var(--muted); opacity: 1; margin-top: 4px; }
 .event-flag { width: 16px; height: 18px; flex: none; align-self: flex-start; color: var(--muted); font-size: 0; line-height: 18px; display: grid; place-items: center; }
-.event-flag::before, .checkpoint::before { content: ''; display: block; width: 16px; height: 16px; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 14V2m0 1c3-3 7 3 10 0v6c-3 3-7-3-10 0' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; }
+.event-flag::before, .checkpoint::before { content: ''; display: block; width: 16px; height: 16px; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 2v12' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M3 3c3-3 7 3 10 0v6c-3 3-7-3-10 0Z' fill='black'/%3E%3C/svg%3E") center/contain no-repeat; }
 .checkpoint { display: grid; place-items: center; width: 24px; height: 24px; font-size: 0; padding: 4px; line-height: 1; }
-[data-theme='dark'] .checkpoint { color: var(--muted); text-shadow: none; }
+.event-flag, .checkpoint, [data-theme='dark'] .checkpoint { color: #000; text-shadow: none; }
+.checkpoint.is-past { opacity: 1; }
 dialog, #editor { border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 24px 80px #00000030; }
 dialog::backdrop { background: #00000038; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
 #editor .task-dialog-head { position: sticky; top: 0; z-index: 20; padding: 12px 24px; gap: 16px; align-items: center; background: var(--subtle); }
