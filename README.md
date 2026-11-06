@@ -97,3 +97,7 @@ Tests exercise the migrations in an isolated Postgres-compatible PGlite instance
 The local sign-in design follows Figma frame `31:856`. Supplied graphics and the Lebowski heading font live in `public/assets/` and are copied into `dist/assets/` during build. The Telegram contact opens `https://t.me/nikitagrosu`. Existing Supabase sign-in and password setup remain connected.
 
 Run `npm run build` then `PORT=4175 npm run preview` for a separate local preview. Transfer the contents of `dist/` when ready to release.
+
+## Interface refresh (2026-11-06)
+
+The dashboard loads ui.css after its base styles. It includes the reviewed light/dark palette, compact filters, centered date controls, branded heading, grouped task editor, and custom date/status popovers. The live Supabase backend, configuration, authentication, migrations and task palette are unchanged. Task controls retain native form values for saves and validation. Calendar tests cover leap years and month boundaries; editor guard tests cover discarded changes. SF Symbols are rendered as monochrome masks. Only reviewed assets are permitted by the public-file audit.

@@ -3,7 +3,7 @@ const sizeLabel=size=>size<1024?size+' Б':size<1048576?(size/1024).toFixed(0)+'
 function resizeTaskContext(){
  if(!$('#editor').open)return;
  const field=$('#taskContext');
- field.style.height='auto';
+ field.style.height='0px';
  field.style.height=(field.scrollHeight+field.offsetHeight-field.clientHeight)+'px';
 }
 $('#taskContext').addEventListener('input',resizeTaskContext);
@@ -22,8 +22,10 @@ function renderMaterials(){
  $('#linkCount').textContent=linkCount?'· '+linkCount:'';
  const attachmentCount=draftAttachments.filter(file=>!file.removed).length;
  $('#attachmentCount').textContent=attachmentCount?'· '+attachmentCount:'';
- $('#taskLinks').innerHTML=draftLinks.length?draftLinks.map((link,i)=>link.removed?`<div class="material-row material-removed">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)}</strong><small role="status">Ссылка убрана из задачи</small></div><button type="button" class="restore-material" data-restore-link="${i}" aria-label="Вернуть ссылку ${esc(link.title)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)} ↗</strong><a href="${esc(safeMaterialUrl(link.url)||'#')}" target="_blank" rel="noopener noreferrer">${esc(link.url)}</a></div><button type="button" data-copy-link="${i}" aria-label="Копировать ссылку ${esc(link.title)}">Копировать</button><button type="button" class="remove-material" data-remove-link="${i}" aria-label="Убрать ссылку ${esc(link.title)}">×</button></div>`).join(''):'<p class="material-empty">Добавьте макет, бриф или папку проекта — всё будет под рукой.</p>';
- $('#taskAttachments').innerHTML=draftAttachments.length?draftAttachments.map((file,i)=>file.removed?`<div class="material-row material-removed">${materialIcon(file)}<div class="material-info"><strong>${esc(file.name)}</strong><small role="status">Файл убран из задачи</small></div><button type="button" class="restore-material" data-restore-file="${i}" aria-label="Вернуть файл ${esc(file.name)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(file)}<div class="material-info"><strong>${esc(file.name)}</strong><small>${esc(file.name.split('.').pop().toUpperCase())} · ${sizeLabel(file.size)}${file.pendingFile?' · К сохранению':''}</small></div><button type="button" data-download-file="${i}" aria-label="Скачать ${esc(file.name)}">↓ Скачать</button><button type="button" class="remove-material" data-remove-file="${i}" aria-label="Убрать файл ${esc(file.name)}">×</button></div>`).join(''):'<p class="material-empty">Прикрепите документы, PDF, изображения и другие файлы.</p>';
+ $('#materialsCount').textContent=linkCount+attachmentCount?'· '+(linkCount+attachmentCount):'';
+ $('#linksHeading').hidden=!draftLinks.length;$('#filesHeading').hidden=!draftAttachments.length;
+ $('#taskLinks').innerHTML=draftLinks.length?draftLinks.map((link,i)=>link.removed?`<div class="material-row material-removed">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)}</strong><small role="status">Ссылка убрана из задачи</small></div><button type="button" class="restore-material" data-restore-link="${i}" aria-label="Вернуть ссылку ${esc(link.title)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)} ↗</strong><a href="${esc(safeMaterialUrl(link.url)||'#')}" target="_blank" rel="noopener noreferrer">${esc(link.url)}</a></div><button type="button" data-copy-link="${i}" aria-label="Копировать ссылку ${esc(link.title)}">Копировать</button><button type="button" class="remove-material" data-remove-link="${i}" aria-label="Убрать ссылку ${esc(link.title)}">×</button></div>`).join(''):'';
+ $('#taskAttachments').innerHTML=draftAttachments.length?draftAttachments.map((file,i)=>file.removed?`<div class="material-row material-removed">${materialIcon(file)}<div class="material-info"><strong>${esc(file.name)}</strong><small role="status">Файл убран из задачи</small></div><button type="button" class="restore-material" data-restore-file="${i}" aria-label="Вернуть файл ${esc(file.name)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(file)}<div class="material-info"><strong>${esc(file.name)}</strong><small>${esc(file.name.split('.').pop().toUpperCase())} · ${sizeLabel(file.size)}${file.pendingFile?' · К сохранению':''}</small></div><button type="button" data-download-file="${i}" aria-label="Скачать ${esc(file.name)}">↓ Скачать</button><button type="button" class="remove-material" data-remove-file="${i}" aria-label="Убрать файл ${esc(file.name)}">×</button></div>`).join(''):'';
 }
 async function copyText(value){try{await navigator.clipboard.writeText(value);toast('Скопировано')}catch{toast('Не удалось скопировать. Проверьте доступ к буферу обмена.')}}
 $('#addLink').onclick=()=>{if(draftLinks.filter(link=>!link.removed).length>=30){toast('Можно прикрепить до 30 ссылок');return}$('#linkComposer').hidden=false;$('#linkTitle').focus()};
@@ -81,7 +83,7 @@ async function uploadTaskAttachments(){
 }
 $('#copySummary').onclick=()=>{
  const f=$('#form').elements;
- const milestones=[...$('#milestones').children].map(row=>row.children[0].value+' — '+row.children[1].value);
+ const milestones=[...$('#milestones').children].map(row=>row.querySelector('input[type="date"]').value+' — '+row.querySelector('input:not([type="date"])').value);
  copyText([f.title.value,f.person.value+' · '+statusLabel[f.status.value],f.end.value?'Дедлайн: '+f.end.value:'',f.context.value,f.note.value,...draftLinks.filter(link=>!link.removed).map(l=>l.title+': '+l.url),...draftAttachments.filter(file=>!file.removed).map(a=>'Файл: '+a.name),...milestones].filter(Boolean).join('\n\n'));
 };
 $('#copyTaskLink').onclick=()=>{const url=new URL(location.href);url.hash='task='+encodeURIComponent(editing);copyText(url.href)};
@@ -119,7 +121,7 @@ $('#shareToggle').onclick=async()=>{
  finally{if(request===shareRequest){shareBusy=false;renderTaskShare()}}
 };
 $('#shareCopy').onclick=()=>{if(shareToken)copyText(publicShareURL())};
-$('#editor').addEventListener('cancel',e=>{if(saving||uploadingMaterials)e.preventDefault()});
+$('#editor').addEventListener('cancel',e=>{e.preventDefault();requestTaskClose()});
 // Dismiss only when both the press and click are outside the dialog.
 // Selecting text inside and releasing over the backdrop keeps the draft open.
 let taskBackdropPress=false;
@@ -131,3 +133,34 @@ $('#editor').addEventListener('close',()=>{shareRequest++;shareToken=null;$('#ta
 let handledTaskHash='';
 function openLinkedTask(){if(!ready||!location.hash.startsWith('#task=')||handledTaskHash===location.hash)return;handledTaskHash=location.hash;let id;try{id=decodeURIComponent(location.hash.slice(6))}catch{return}if(tasks.some(t=>t.id===id))edit(id);else toast('Задача не найдена в текущем плане')}
 window.addEventListener('hashchange',()=>{handledTaskHash='';openLinkedTask()});
+
+let taskDraftBaseline='';
+function taskDraftSnapshot(){
+ return JSON.stringify({fields:[...new FormData($('#form'))].filter(([,v])=>typeof v==='string'),milestones:[...document.querySelectorAll('#milestones input')].map(el=>el.value),links:draftLinks,attachments:draftAttachments,linkTitle:$('#linkTitle').value,linkUrl:$('#linkUrl').value});
+}
+function markTaskDraftClean(){taskDraftBaseline=taskDraftSnapshot()}
+function hasTaskDraftChanges(){return $('#editor').open&&taskDraftBaseline!==taskDraftSnapshot()}
+function requestTaskClose(){
+ if(saving||uploadingMaterials)return;
+ if(!hasTaskDraftChanges()){$('#editor').close();return}
+ if(!discardDraft.open)discardDraft.showModal();
+}
+const discardDraft=document.createElement('dialog');discardDraft.id='discardDraft';discardDraft.setAttribute('aria-labelledby','discardDraftTitle');
+discardDraft.innerHTML='<h2 id="discardDraftTitle">Сохранить изменения?</h2><p>В задаче есть несохранённые изменения. Продолжите редактирование, чтобы сохранить их, или отбросьте черновик.</p><div class="discard-actions"><button type="button" id="discardChanges" class="danger">Отбросить</button><button type="button" id="keepEditing" class="primary" autofocus>Продолжить редактирование</button></div>';
+document.body.append(discardDraft);
+$('#keepEditing').onclick=()=>discardDraft.close();
+$('#discardChanges').onclick=()=>{discardDraft.close();$('#editor').close()};
+window.addEventListener('beforeunload',e=>{if(hasTaskDraftChanges()){e.preventDefault();e.returnValue=''}});
+const toolbarMenus=[...document.querySelectorAll('.toolbar details, .task-menu')];
+document.addEventListener('click',e=>{for(const menu of toolbarMenus){if(menu.open&&!menu.contains(e.target))menu.open=false}});
+for(const menu of toolbarMenus)menu.querySelector('summary').addEventListener('click',()=>{for(const other of toolbarMenus)if(other!==menu)other.open=false});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const menu of toolbarMenus)if(menu.open){menu.open=false;menu.querySelector('summary').focus();e.preventDefault()}}});
+
+$('#cancelTask').onclick=requestTaskClose;
+
+$('.task-menu-options').addEventListener('click',e=>{if(e.target.closest('button')){$('.task-menu').open=false;$('.task-menu summary').focus()}});
+$('#editor').addEventListener('close',()=>{$('.task-menu').open=false});
+
+// Native selects can report focus-visible after a click; reserve rings for keys.
+document.addEventListener('pointerdown',()=>{document.documentElement.dataset.inputModality='pointer'},true);
+document.addEventListener('keydown',e=>{if(e.key==='Tab'||e.key.startsWith('Arrow'))document.documentElement.dataset.inputModality='keyboard'},true);

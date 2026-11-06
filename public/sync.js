@@ -1,7 +1,13 @@
 let revision=0,editRevision=0,ready=false,saving=false,polling=false,archiveRevision=0;
 let fileHandle=null,fileRevision=-1,fileQueue=Promise.resolve();
 const syncStatus=$('#syncStatus');
-function status(message,error=false){syncStatus.textContent=message;syncStatus.classList.toggle('error-text',error)}
+let lastSyncTime='';
+function status(message,error=false){
+ if(!message)lastSyncTime=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+ syncStatus.textContent=message||'Синхронизировано · '+lastSyncTime;syncStatus.classList.toggle('error-text',error);syncStatus.title=syncStatus.textContent;
+ const retry=$('#retrySync');if(retry)retry.hidden=!error;
+}
+const retrySync=document.createElement('button');retrySync.id='retrySync';retrySync.type='button';retrySync.textContent='Повторить';retrySync.hidden=true;retrySync.onclick=()=>refresh();syncStatus.after(retrySync);
 function controls(){ $('#add').disabled=!ready||saving||uploadingMaterials;$('#import').disabled=!ready||saving||uploadingMaterials;$('#form').querySelectorAll('button').forEach(b=>b.disabled=saving||uploadingMaterials); }
 let authEpoch=0,authInitializing=true;
 const authLink=consumeAuthLink(window.location,window.history);
@@ -40,7 +46,7 @@ $('#form').onsubmit=async e=>{
  uploadingMaterials=true;controls();$('#saveTask').textContent='Сохраняем…';
  try{
  const attachments=await uploadTaskAttachments();
- const task={context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:f.person.value.trim()||'Не назначен',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.children[0].value,label:row.children[1].value.trim()}))};
+ const task={context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:f.person.value.trim()||'Не назначен',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.querySelector('input[type="date"]').value,label:row.querySelector('input:not([type="date"])').value.trim()}))};
  if(!task.title)return;
  if(await change('upsert',{task},editRevision))$('#editor').close();
  }catch(error){toast(error.message)}finally{uploadingMaterials=false;controls();$('#saveTask').textContent='Сохранить'}

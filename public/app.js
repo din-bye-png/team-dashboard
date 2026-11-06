@@ -17,46 +17,50 @@ const taskFilters=[
  {id:'undated',label:'Без срока',matches:t=>!t.end&&t.status!=='done'},
  {id:'blocked',label:'На стопе',matches:t=>t.status==='blocked'},
 ];
-const statIcons={all:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h.01M11 8h5M8 12h.01M11 12h5M8 16h.01M11 16h5"/>',active:'<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>',undated:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-11 4 4 4m0-4-4 4"/>',blocked:'<circle cx="12" cy="12" r="9"/><path d="M9 8v8m6-8v8"/>'};
+import {statIcons} from './filter-icons.js';
+import {initPickers,syncPickers,closePickers} from './pickers.js';
 const DAYS=98;let calendarStart=day(rangeStart,-42),dayWidth=60;
-function updateRange(){ $('#range').textContent=`${fmt(rangeStart)} — ${fmt(day(rangeStart,13))} ${parse(rangeStart).getFullYear()}`; }
+const visibleDays=()=>matchMedia('(max-width:680px)').matches?7:14;
+function updateRange(){ $('#range').textContent=`${fmt(rangeStart)} — ${fmt(day(rangeStart,visibleDays()-1))} ${parse(rangeStart).getFullYear()}`; }
 function render(){
 if(taskResize)cancelTaskResize(false);
 if(typeof hideFlagTooltip==='function'&&typeof tooltipAnchor!=='undefined')hideFlagTooltip();
 calendarStart=day(rangeStart,-42);
 const labelWidth=parseFloat(getComputedStyle($('.scroll')).getPropertyValue('--label-width'))||200;
-dayWidth=Math.max(22,($('.scroll').clientWidth-labelWidth)/14);
+dayWidth=Math.max(22,($('.scroll').clientWidth-labelWidth)/visibleDays());
 $('#gantt').style.width=(labelWidth+DAYS*dayWidth)+'px';
 $('#gantt').style.setProperty('--days',DAYS);
 const selected=$('#person').value;
 const personTasks=tasks.filter(t=>!selected||t.person===selected);
 const visible=personTasks.filter(taskFilters.find(filter=>filter.id===view).matches);
-const taskCount=tasks.length;
+const taskCount=visible.length;
 $('#gantt').style.setProperty('--row-height',Math.max(48,($('.scroll').clientHeight-60)/Math.max(taskCount,9))+'px');
-$('#stats').innerHTML=taskFilters.map(filter=>`<button type="button" class="stat${view===filter.id?' is-selected':''}" data-task-filter="${filter.id}" aria-pressed="${view===filter.id}" aria-controls="gantt"><span class="stat-caption"><svg viewBox="0 0 24 24" aria-hidden="true">${statIcons[filter.id]}</svg>${filter.label}</span><strong>${personTasks.filter(filter.matches).length}</strong></button>`).join('');
+$('#stats').innerHTML=taskFilters.map(filter=>`<button type="button" class="stat${view===filter.id?' is-selected':''}" data-task-filter="${filter.id}" aria-pressed="${view===filter.id}" aria-controls="gantt"><span class="stat-caption">${statIcons[filter.id]}${filter.label}</span><strong>${personTasks.filter(filter.matches).length}</strong></button>`).join('');
 const people=[...new Set(tasks.map(t=>t.person))];$('#person').innerHTML='<option value="">Вся команда</option>'+people.map(p=>`<option ${selected===p?'selected':''}>${esc(p)}</option>`).join('');
 updateRange();
 let dates=Array.from({length:DAYS},(_,i)=>day(calendarStart,i)),todayIndex=diff(TODAY,calendarStart);let html='<div class="grid-head"><div class="head-label">Задача / ответственный</div><div class="dates">'+dates.map(d=>`<div class="date ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"><b>${parse(d).getDate()}</b><span>${parse(d).toLocaleDateString('ru-RU',{weekday:'short'})}</span></div>`).join('')+'</div></div>';
 for(const t of visible){let[c,bg,ink]=colors(t),style=`--color:${c};--tint:${bg};--bar-ink:${ink}`,start=t.start||BASE;let left=Math.max(0,diff(start,calendarStart)),right=Math.min(DAYS,diff(t.end,calendarStart)+1);let bar='';
-if(t.end&&right>left&&diff(start,calendarStart)<DAYS){const detail=t.status==='blocked'?'На стопе':fmt(t.end);const compact=(right-left)*dayWidth-10<150;bar=`<div class="bar ${t.status} ${compact?'compact':''}" style="left:calc(${left/DAYS*100}% + 5px);width:calc(${(right-left)/DAYS*100}% - 10px)" tabindex="0" role="button" aria-label="${esc(t.title)}: показать комментарий"><span class="bar-name">${esc(t.title)}</span><span class="bar-detail">${esc(detail)}</span>${diff(start,calendarStart)>=0?`<span class="bar-resize-handle resize-start" data-resize-edge="start" role="slider" tabindex="0" aria-label="Начало задачи ${esc(t.title)}" aria-valuemin="${diff(calendarStart,'1970-01-01')}" aria-valuemax="${diff(t.end,'1970-01-01')}" aria-valuenow="${diff(start,'1970-01-01')}" aria-valuetext="${esc(fmt(start))}" title="Потяните, чтобы изменить начало"></span>`:''}${diff(t.end,calendarStart)<DAYS?`<span class="bar-resize-handle resize-end" data-resize-edge="end" role="slider" tabindex="0" aria-label="Дедлайн задачи ${esc(t.title)}" aria-valuemin="${diff(start,'1970-01-01')}" aria-valuemax="${diff(day(calendarStart,DAYS-1),'1970-01-01')}" aria-valuenow="${diff(t.end,'1970-01-01')}" aria-valuetext="${esc(fmt(t.end))}" title="Потяните, чтобы изменить дедлайн"></span>`:''}</div>`}
+if(t.end&&right>left&&diff(start,calendarStart)<DAYS){const detail=t.status==='blocked'?'На стопе':fmt(t.end);const compact=(right-left)*dayWidth-10<150;bar=`<div class="bar ${t.status} ${compact?'compact':''}" style="left:calc(${left/DAYS*100}% + 5px);width:calc(${(right-left)/DAYS*100}% - 10px)" tabindex="0" role="button" aria-label="${esc(t.title)}: открыть задачу"><span class="bar-name">${esc(t.title)}</span><span class="bar-detail">${esc(detail)}</span>${diff(start,calendarStart)>=0?`<span class="bar-resize-handle resize-start" data-resize-edge="start" role="slider" tabindex="0" aria-label="Начало задачи ${esc(t.title)}" aria-valuemin="${diff(calendarStart,'1970-01-01')}" aria-valuemax="${diff(t.end,'1970-01-01')}" aria-valuenow="${diff(start,'1970-01-01')}" aria-valuetext="${esc(fmt(start))}" title="Потяните, чтобы изменить начало"></span>`:''}${diff(t.end,calendarStart)<DAYS?`<span class="bar-resize-handle resize-end" data-resize-edge="end" role="slider" tabindex="0" aria-label="Дедлайн задачи ${esc(t.title)}" aria-valuemin="${diff(start,'1970-01-01')}" aria-valuemax="${diff(day(calendarStart,DAYS-1),'1970-01-01')}" aria-valuenow="${diff(t.end,'1970-01-01')}" aria-valuetext="${esc(fmt(t.end))}" title="Потяните, чтобы изменить дедлайн"></span>`:''}</div>`}
 
-if(!t.end)bar=`<span class="undated" tabindex="0" role="button" aria-label="${esc(t.title)}: показать комментарий">${t.status==='waiting'?'↩ Ждём обратную связь':'··· Дедлайн не указан'}</span>`;
+if(!t.end)bar=`<span class="undated" tabindex="0" role="button" aria-label="${esc(t.title)}: открыть задачу">${t.status==='waiting'?'↩ Ждём обратную связь':'··· Дедлайн не указан'}</span>`;
 let flags=t.milestones.filter(m=>diff(m.date,calendarStart)>=0&&diff(m.date,calendarStart)<DAYS).map(m=>`<button class="checkpoint${m.date<TODAY?' is-past':''}" data-edit="${esc(t.id)}" style="left:${(diff(m.date,calendarStart)+.5)/DAYS*100}%" data-tooltip-label="${esc(m.label)}" data-tooltip-date="${esc(fmt(m.date))}" data-tooltip-task="${esc(t.title)}" aria-label="${esc(m.label)} · ${fmt(m.date)}">⚑</button>`).join('');
-html+=`<div class="task-row" data-task-id="${esc(t.id)}" style="${style}"><div class="task-label-cell"><button class="task-drag-handle" aria-label="Переместить ${esc(t.title)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-move="${esc(t.id)}"><svg viewBox="0 0 12 18" aria-hidden="true"><path d="M3 3h.01M9 3h.01M3 9h.01M9 9h.01M3 15h.01M9 15h.01"/></svg></button><button class="task-label" data-edit="${esc(t.id)}"><div><div class="task-title">${esc(t.title)}</div><div class="task-meta">${esc(t.person)} <span class="status-badge">${t.status!=='active'?'· '+statusLabel[t.status]:''}</span></div></div></button></div><div class="track" data-edit="${esc(t.id)}">${dates.map(d=>`<div class="cell ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"></div>`).join('')}${todayIndex>=0&&todayIndex<DAYS?`<div class="today-line" style="left:${(todayIndex+.5)/DAYS*100}%"></div>`:''}${bar}${flags}</div></div>`;
+html+=`<div class="task-row" data-task-id="${esc(t.id)}" style="${style}"><div class="task-label-cell"><button class="task-drag-handle" aria-label="Переместить ${esc(t.title)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-move="${esc(t.id)}"><svg viewBox="0 0 12 18" aria-hidden="true"><path d="M3 3h.01M9 3h.01M3 9h.01M9 9h.01M3 15h.01M9 15h.01"/></svg></button><button class="task-label" data-edit="${esc(t.id)}"><div><div class="task-title">${esc(t.title)}</div><div class="task-meta">${esc(t.person)} <span class="status-badge">${'· '+statusLabel[t.status]+(t.end&&t.end<TODAY&&t.status!=='done'?' · Просрочена':'')}</span></div></div></button></div><div class="track" data-edit="${esc(t.id)}">${dates.map(d=>`<div class="cell ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"></div>`).join('')}${todayIndex>=0&&todayIndex<DAYS?`<div class="today-line" style="left:${(todayIndex+.5)/DAYS*100}%"></div>`:''}${bar}${flags}</div></div>`;
 }
 $('#gantt').innerHTML=html+(visible.length?'':'<p style="padding:30px;color:#aaa">Задач по этому фильтру нет.</p>');
 $('.scroll').scrollLeft=42*dayWidth;$('#gantt').style.setProperty('--calendar-offset',$('.scroll').scrollLeft+'px');
-const events=tasks.filter(t=>t.status!=='done'&&(!selected||t.person===selected)).flatMap(t=>[...t.milestones,...(t.end&&!t.milestones.some(m=>m.date===t.end)?[{date:t.end,label:'Дедлайн'}]:[])].map(m=>({...m,task:t}))).filter(m=>m.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
+const events=visible.filter(t=>t.status!=='done').flatMap(t=>[...t.milestones,...(t.end&&!t.milestones.some(m=>m.date===t.end)?[{date:t.end,label:'Дедлайн'}]:[])].map(m=>({...m,task:t}))).filter(m=>m.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
 let lastDate='';
 $('#radar').innerHTML=events.length?events.map(e=>{const[c,bg,ink]=colors(e.task);let heading=e.date!==lastDate?`<h3 class="radar-date">${e.date===TODAY?'Сегодня · ':''}${parse(e.date).toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}</h3>`:'';lastDate=e.date;return heading+`<button class="event" title="${esc(e.label)} · ${esc(e.task.title)}" data-edit="${esc(e.task.id)}" style="--tint:${bg};--color:${c};--bar-ink:${ink}"><span class="event-flag" aria-hidden="true">⚑</span><span class="event-info">${esc(e.label)}<small>${esc(e.task.title)} · ${esc(e.task.person)}</small></span></button>`}).join(''):'<p class="small">Предстоящих событий нет.</p>';
-updateLinkedTask();
+updateLinkedTask();updateBarLabels();syncPickers();
+$('.radar-subtitle').textContent=view==='all'?'Ближайшие события':'События · '+taskFilters.find(f=>f.id===view).label;
+$('#prev').setAttribute('aria-label','Назад на '+visibleDays()+' дней');$('#next').setAttribute('aria-label','Вперёд на '+visibleDays()+' дней');
 
 }
-function addMilestone(m={date:'',label:''}){let row=document.createElement('div');row.className='milestone-row';row.innerHTML=`<input type="date" required aria-label="Дата чекпойнта" value="${esc(m.date)}"><input required aria-label="Название чекпойнта" placeholder="Например, показ клиенту" value="${esc(m.label)}"><button type="button" aria-label="Удалить чекпойнт">×</button>`;row.querySelector('button').onclick=()=>row.remove();$('#milestones').append(row)}
-function edit(id){if(!ready||saving)return;editRevision=revision;$('#editWarning').hidden=true;editing=id||crypto.randomUUID();let t=tasks.find(t=>t.id===id)||{title:'',person:'',status:'active',start:'',end:'',note:'',milestones:[]};$('#form').reset();for(let k of ['title','person','status','start','end','note'])$('#form').elements[k].value=t[k]||'';$('#editTitle').textContent=id?t.title:'Новая задача';$('#delete').hidden=!id;$('#milestones').innerHTML='';t.milestones.forEach(addMilestone);resetTaskContext(t);$('#copyTaskLink').hidden=!id;$('#editor').showModal();resizeTaskContext();loadTaskShare(id)}
+function addMilestone(m={date:'',label:''}){let row=document.createElement('div');row.className='milestone-row';row.innerHTML=`<input type="date" required aria-label="Дата чекпойнта" value="${esc(m.date)}"><input required aria-label="Название чекпойнта" placeholder="Например, показ клиенту" value="${esc(m.label)}"><button type="button" aria-label="Удалить чекпойнт">×</button>`;row.querySelector('button').onclick=()=>row.remove();$('#milestones').append(row);initPickers(row)}
+function edit(id){if(!ready||saving)return;editRevision=revision;$('#editWarning').hidden=true;editing=id||crypto.randomUUID();let t=tasks.find(t=>t.id===id)||{title:'',person:'',status:'active',start:'',end:'',note:'',milestones:[]};$('#form').reset();for(let k of ['title','person','status','start','end','note'])$('#form').elements[k].value=t[k]||'';$('#editTitle').textContent=id?t.title:'Новая задача';$('#delete').hidden=!id;$('#milestones').innerHTML='';t.milestones.forEach(addMilestone);resetTaskContext(t);$('#copyTaskLink').hidden=!id;$('#editor').showModal();resizeTaskContext();syncPickers($('#form'));markTaskDraftClean();$('#form').elements.title.focus({preventScroll:true});loadTaskShare(id)}
 $('#radar').onclick=e=>{const item=e.target.closest('[data-edit]');if(item)edit(item.dataset.edit)};
 $('#gantt').onclick=e=>{const target=e.target.closest('[data-edit]');if(target)edit(target.dataset.edit)};
-$('#add').onclick=()=>edit();$('#close').onclick=()=>{if(!saving&&!uploadingMaterials)$('#editor').close()};$('#addMilestone').onclick=()=>addMilestone();
+$('#add').onclick=()=>edit();$('#close').onclick=()=>{if(!saving&&!uploadingMaterials)requestTaskClose()};$('#addMilestone').onclick=()=>addMilestone();
 $('#person').onchange=render;
 $('#stats').onclick=e=>{
  const button=e.target.closest('[data-task-filter]');
@@ -65,9 +69,9 @@ $('#stats').onclick=e=>{
  view=button.dataset.taskFilter;render();
  $('#stats').querySelector(`[data-task-filter="${view}"]`).focus({preventScroll:true});
 };
-$('#prev').onclick=()=>{rangeStart=day(rangeStart,-14);render()};$('#next').onclick=()=>{rangeStart=day(rangeStart,14);render()};$('#today').onclick=()=>{rangeStart=day(TODAY,-((parse(TODAY).getDay()+6)%7));render()};
+$('#prev').onclick=()=>{rangeStart=day(rangeStart,-visibleDays());render()};$('#next').onclick=()=>{rangeStart=day(rangeStart,visibleDays());render()};$('#today').onclick=()=>{rangeStart=day(TODAY,-((parse(TODAY).getDay()+6)%7));render()};
 
-const scroller=$('.scroll');let scrollFrame=0;scroller.addEventListener('scroll',()=>{if(taskReorder||taskResize||scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;if(taskResize)return;$('#gantt').style.setProperty('--calendar-offset',scroller.scrollLeft+'px');const offset=Math.round(scroller.scrollLeft/dayWidth);rangeStart=day(calendarStart,offset);updateRange();if(offset<10||offset>DAYS-25)render();});},{passive:true});
+const scroller=$('.scroll');let scrollFrame=0;scroller.addEventListener('scroll',()=>{if(taskReorder||taskResize||scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;if(taskResize)return;$('#gantt').style.setProperty('--calendar-offset',scroller.scrollLeft+'px');const offset=Math.round(scroller.scrollLeft/dayWidth);rangeStart=day(calendarStart,offset);updateRange();updateBarLabels();if(offset<10||offset>DAYS-25)render();});},{passive:true});
 // Touch and trackpad scrolling keep browser-native inertia; mouse drag follows the pointer.
 let drag=null,suppressClick=false;
 scroller.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0||e.target.closest('.task-label-cell,.head-label'))return;drag={id:e.pointerId,x:e.clientX,scroll:scroller.scrollLeft,moved:false};});
@@ -113,3 +117,11 @@ radarPanel.addEventListener('pointerout',e=>{const card=e.target.closest('.event
 radarPanel.addEventListener('pointerleave',()=>{radarHoverId=null;updateLinkedTask()});
 radarPanel.addEventListener('focusin',e=>{const card=e.target.closest('.event');radarFocusId=card?.dataset.edit||null;updateLinkedTask()});
 radarPanel.addEventListener('focusout',e=>{radarFocusId=e.relatedTarget?.closest?.('.event')?.dataset.edit||null;updateLinkedTask()});
+
+function updateBarLabels(){
+ const edge=scroller.getBoundingClientRect().left+(parseFloat(getComputedStyle(scroller).getPropertyValue('--label-width'))||200);
+ const updates=[...document.querySelectorAll('.bar')].map(bar=>{const r=bar.getBoundingClientRect();return [bar,Math.min(Math.max(14,edge-r.left+14),Math.max(14,r.width-32))]});
+ for(const [bar,padding] of updates)bar.style.paddingLeft=padding+'px';
+}
+
+initPickers(document);
