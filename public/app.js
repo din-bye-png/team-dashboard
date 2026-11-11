@@ -69,7 +69,7 @@ $('#stats').onclick=e=>{
 };
 $('#prev').onclick=()=>{rangeStart=day(rangeStart,-visibleDays());render()};$('#next').onclick=()=>{rangeStart=day(rangeStart,visibleDays());render()};$('#today').onclick=()=>{rangeStart=day(TODAY,-((parse(TODAY).getDay()+6)%7));render()};
 
-const scroller=$('.scroll');let scrollFrame=0;scroller.addEventListener('scroll',()=>{if(taskReorder||taskResize||scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;if(taskResize)return;$('#gantt').style.setProperty('--calendar-offset',scroller.scrollLeft+'px');const offset=Math.round(scroller.scrollLeft/dayWidth);rangeStart=day(calendarStart,offset);updateRange();updateBarLabels();if(offset<10||offset>DAYS-25)render();});},{passive:true});
+const scroller=$('.scroll');let scrollFrame=0;scroller.addEventListener('scroll',()=>{if(taskReorder||taskResize||scrollFrame)return;scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;if(taskResize)return;$('#gantt').style.setProperty('--calendar-offset',scroller.scrollLeft+'px');const offset=Math.round(scroller.scrollLeft/dayWidth);rangeStart=day(calendarStart,offset);updateRange();updateBarLabels();if(offset<10||offset>DAYS-25){const before=scroller.scrollLeft,fraction=before-offset*dayWidth;render();scroller.scrollLeft+=fraction;$('#gantt').style.setProperty('--calendar-offset',scroller.scrollLeft+'px');if(drag)drag.scroll+=scroller.scrollLeft-before;}});},{passive:true});
 // Touch and trackpad scrolling keep browser-native inertia; mouse drag follows the pointer.
 let drag=null,suppressClick=false;
 scroller.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0||e.target.closest('.task-label-cell,.head-label'))return;drag={id:e.pointerId,x:e.clientX,scroll:scroller.scrollLeft,moved:false};});
@@ -116,10 +116,16 @@ radarPanel.addEventListener('pointerleave',()=>{radarHoverId=null;updateLinkedTa
 radarPanel.addEventListener('focusin',e=>{const card=e.target.closest('.event');radarFocusId=card?.dataset.edit||null;updateLinkedTask()});
 radarPanel.addEventListener('focusout',e=>{radarFocusId=e.relatedTarget?.closest?.('.event')?.dataset.edit||null;updateLinkedTask()});
 
+// Titles stick to the visible edge with CSS (position: sticky), so they move with the
+// scroll itself. Script only switches which assignee labels show, never their positions.
 function updateBarLabels(){
- const edge=scroller.getBoundingClientRect().left+(parseFloat(getComputedStyle(scroller).getPropertyValue('--label-width'))||200);
- const updates=[...document.querySelectorAll('.bar')].map(bar=>{const r=bar.getBoundingClientRect();return [bar,Math.min(Math.max(14,edge-r.left+14),Math.max(14,r.width-32))]});
- for(const [bar,padding] of updates){bar.style.paddingLeft=padding+'px';if(bar.classList.contains('has-assignments'))layoutAssignmentLabels(bar,padding)}
+ for(const bar of document.querySelectorAll('.bar')){
+  if(bar.classList.contains('has-assignments')){layoutAssignmentLabels(bar);continue}
+  // Plain bars: the deadline date gives way when the sliding title reaches it.
+  const name=bar.querySelector('.bar-name'),detail=bar.querySelector('.bar-detail');if(!name||!detail)continue;
+  detail.classList.remove('is-hidden');
+  if(detail.offsetParent&&name.getBoundingClientRect().right+8>detail.getBoundingClientRect().left)detail.classList.add('is-hidden');
+ }
 }
 
 initPickers(document);

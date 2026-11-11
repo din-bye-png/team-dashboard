@@ -23,47 +23,39 @@ function assignmentLayer(task,from,to){
  return {className:'has-assignments',layer,lead,chips,nameStyle:''};
 }
 
-// Keeps the title and assignee labels from overlapping, at any scroll position.
-// `start` is where the title begins inside the bar (it sticks to the visible left edge).
-// The segment under the title shows its person right after the title; every later
-// segment shows its label at its own start, shrinks to the avatar when space is short,
-// and hides when even the avatar does not fit. Nothing crosses into the date on the right.
-function layoutAssignmentLabels(bar,start){
- const width=bar.clientWidth,name=bar.querySelector('.bar-name'),slot=bar.querySelector('.assignee-chip.is-lead'),detail=bar.querySelector('.bar-detail');
- if(!width||!name||!slot)return;
- const title=bar.querySelector('.bar-title'),gap=8;
- name.style.maxWidth='none';
- // When only a sliver of the bar is visible the date gives way to the title.
- if(detail)detail.classList.remove('is-hidden');
- const titleWidth=title.scrollWidth;
- let detailWidth=detail&&detail.offsetParent?detail.offsetWidth+10:0;
- if(detailWidth&&width-14-detailWidth-start<Math.min(titleWidth,96)){detail.classList.add('is-hidden');detailWidth=0}
- const right=width-14-detailWidth;
+// Keeps the title and assignee labels from overlapping at any scroll position.
+// Positions come from CSS: the title group is sticky at the visible left edge and every
+// other label sits at the start of its own segment. This only toggles states:
+// - the person beside the title is whoever's segment is under it right now;
+// - that label shrinks to the avatar, then hides, when the title needs the room;
+// - a later label shrinks to the avatar if its segment is narrow and hides while the
+//   title group passes over it; the deadline date hides when the title reaches it.
+function layoutAssignmentLabels(bar){
+ const width=bar.clientWidth,name=bar.querySelector('.bar-name'),slot=bar.querySelector('.assignee-chip.is-lead'),title=bar.querySelector('.bar-title'),detail=bar.querySelector('.bar-detail');
+ if(!width||!name||!slot||!title)return;
+ const box=bar.getBoundingClientRect(),gap=8;
  const segments=[...bar.querySelectorAll('.assignee-chip[data-from]')].map(chip=>({chip,from:Number(chip.dataset.from)/100*width,to:Number(chip.dataset.to)/100*width}));
- const current=segments.find(s=>s.from<=start+1&&s.to>start+1),next=segments.find(s=>s.from>start+1);
+ const start=name.getBoundingClientRect().left-box.left,titleWidth=title.scrollWidth;
+ // The person beside the title is whoever's segment lies under that label itself.
+ const at=x=>segments.find(s=>s.from<=x+1&&s.to>x+1);
+ const current=at(start+titleWidth+gap)||at(start);
  if(current){if(slot.dataset.for!==current.chip.dataset.id){slot.innerHTML=current.chip.innerHTML;slot.dataset.for=current.chip.dataset.id}slot.hidden=false}
  else{slot.hidden=true;slot.dataset.for=''}
- // The title wins: first the person beside it shrinks to an avatar, then disappears,
- // and only then the title is shortened (never below a readable minimum).
- const room=Math.max(0,Math.min(next?next.from-gap:right,right)-start);
+ if(detail)detail.classList.remove('is-hidden');
+ const detailLeft=detail&&detail.offsetParent?detail.getBoundingClientRect().left-box.left:width-14;
+ const minTitle=Math.min(titleWidth,96),limit=detailLeft-gap-start;
  slot.classList.remove('is-compact');
- const minTitle=Math.min(titleWidth,96,Math.max(0,right-start));
- let nameWidth=room;
- // Measure parts separately: the title shrinks inside its flex row, so the row never reports overflow.
- const leadNeed=()=>slot.hidden?0:gap+slot.offsetWidth;
- if(current){
-  if(titleWidth+leadNeed()>room){slot.classList.add('is-compact');if(minTitle+leadNeed()>room){slot.hidden=true;nameWidth=Math.max(room,minTitle)}}
- }else nameWidth=Math.max(room,minTitle);
- name.style.maxWidth=nameWidth+'px';
- let previousEnd=start+Math.min(titleWidth+leadNeed(),nameWidth);
+ if(!slot.hidden&&titleWidth+gap+slot.offsetWidth>limit){slot.classList.add('is-compact');if(minTitle+gap+slot.offsetWidth>limit)slot.hidden=true}
+ const groupWidth=Math.min(titleWidth,Math.max(minTitle,limit-(slot.hidden?0:gap+slot.offsetWidth)))+(slot.hidden?0:gap+slot.offsetWidth);
+ let groupEnd=start+groupWidth;
+ if(detail&&detail.offsetParent&&groupEnd+gap>detailLeft){detail.classList.add('is-hidden');}
  for(const s of segments){
   s.chip.classList.remove('is-compact','is-hidden');
   if(s===current||s.to<=start+1){s.chip.classList.add('is-hidden');continue}
-  const left=Math.max(s.from,previousEnd+gap)+6,room=Math.min(s.to,right)-left-6;
-  s.chip.style.left=left+'px';
+  const left=s.from+6,room=Math.min(s.to,detail&&!detail.classList.contains('is-hidden')?detailLeft-gap:width-14)-left-6;
+  if(left<groupEnd+gap){s.chip.classList.add('is-hidden');continue}
   if(s.chip.offsetWidth>room)s.chip.classList.add('is-compact');
-  if(s.chip.offsetWidth>room){s.chip.classList.add('is-hidden');continue}
-  previousEnd=left+s.chip.offsetWidth;
+  if(s.chip.offsetWidth>room)s.chip.classList.add('is-hidden');
  }
 }
 
