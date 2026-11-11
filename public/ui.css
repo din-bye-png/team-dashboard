@@ -408,3 +408,94 @@ dialog::backdrop { background: #00000038; backdrop-filter: blur(5px); -webkit-ba
  .calendar-picker .calendar-day { min-height: 38px; }
 }
 @media (prefers-reduced-motion:reduce) { .picker-popover button { transition: none; } }
+
+/* Team assignments inside Gantt bars */
+.bar.has-assignments:not(.blocked) { background: color-mix(in srgb, var(--color) 55%, var(--surface)); }
+.assignment-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.assignment-segment { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--color) var(--load), var(--surface)); }
+.assignment-segment.is-handover { box-shadow: inset 1px 0 0 color-mix(in srgb, var(--surface) 35%, transparent); }
+.bar.blocked .assignment-segment { background: transparent; }
+.bar.has-assignments .bar-name, .bar.has-assignments .bar-detail { position: relative; z-index: 1; }
+.bar.has-assignments .bar-name { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; margin-right: auto; }
+.bar.has-assignments .bar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.assignee-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; font-weight: 400; font-size: 11px; white-space: nowrap; }
+.assignee-chip:not(.is-lead) { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; pointer-events: none; }
+.assignee-avatar { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; background: var(--avatar-bg, #fff); color: var(--avatar-ink, #17191c); font-size: 9px; font-weight: 600; line-height: 1; text-align: center; box-shadow: none; object-fit: cover; }
+.bar.has-assignments .bar-name { padding-block: 2px; }
+#flag-tooltip .assignee-avatar { display: inline-flex; align-items: center; justify-content: center; padding: 0; margin: 0; }
+.assignee-chip.is-lead::before { content: ""; width: 1px; height: 12px; margin-right: 3px; background: currentColor; opacity: .3; }
+.bar.compact .assignee-label { display: none; }
+.assignee-chip.is-compact { gap: 0; }
+.assignee-chip.is-compact .assignee-label { display: none; }
+.assignee-chip.is-hidden, .assignee-chip.is-lead[hidden], .bar-detail.is-hidden { display: none; }
+.bar.has-assignments .bar-name { overflow: hidden; }
+
+.bar.compact .assignee-chip.is-lead { gap: 0; }
+.tooltip-assignees { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.tooltip-assignees li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.tooltip-assignees small { display: block; color: var(--muted); font-size: 11px; }
+
+/* Assignees in the task card and roster dialog */
+.assignment-heading { margin-top: 18px; }
+#editor .assignment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px; gap: 6px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+#editor .assignment-row:last-child { border-bottom: 0; padding-bottom: 0; }
+#editor .assignment-row > span { min-width: 0; display: block; }
+#editor .assignment-row .picker-trigger { font-size: .75rem; width: 100%; }
+#editor .assignment-start { grid-column: 1; grid-row: 2; }
+#editor .assignment-end { grid-column: 2; grid-row: 2; }
+#editor .assignment-remove { grid-column: 3; grid-row: 1; padding: 3px; }
+#teamDialog { width: min(560px, calc(100vw - 32px)); }
+#teamDialog .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 8px; }
+#closeTeam { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: var(--pill); color: var(--ink); }
+#closeTeam svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.team-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 30px; gap: 8px; align-items: center; margin: 10px 0; }
+.team-row .assignee-avatar { width: 28px; height: 28px; font-size: 11px; box-shadow: none; }
+.avatar-picker { position: relative; }
+.avatar-picker summary { list-style: none; cursor: pointer; border-radius: 50%; display: grid; place-items: center; }
+.avatar-picker summary::-webkit-details-marker { display: none; }
+.avatar-picker summary:hover .assignee-avatar { box-shadow: 0 0 0 2px var(--line); }
+.avatar-panel { position: absolute; z-index: 20; top: 36px; left: 0; width: 196px; padding: 10px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow, 0 8px 24px #0000001f); border: 1px solid var(--line); display: grid; gap: 8px; }
+.avatar-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.avatar-swatch { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 0; background: var(--swatch); box-shadow: inset 0 0 0 1px #0000001a; }
+.avatar-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.avatar-upload, .avatar-remove-photo { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; background: var(--pill); color: var(--ink); cursor: pointer; border: 0; }
+.avatar-remove-photo[hidden] { display: none; }
+#legacyPerson { margin: 0 0 8px; }
+.team-row > button { padding: 3px; }
+#teamError { color: #d8453b; font-size: 12px; }
+#teamDialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* Team button in the toolbar (replaces the old people filter) */
+.team-button { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 8px; border: 0; border-radius: 18px; background: var(--pill); color: var(--ink); font-size: .75rem; cursor: pointer; }
+.team-button:hover { background: var(--hover, var(--pill)); }
+.team-stack { display: flex; }
+.team-stack .assignee-avatar { width: 22px; height: 22px; font-size: 9px; box-shadow: 0 0 0 2px var(--pill); }
+.team-stack .assignee-avatar + .assignee-avatar { margin-left: -7px; }
+.team-stack-empty { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1px dashed var(--muted); color: transparent; font-size: 0; box-sizing: border-box; background: linear-gradient(var(--muted), var(--muted)) center / 9px 1.5px no-repeat, linear-gradient(var(--muted), var(--muted)) center / 1.5px 9px no-repeat; }
+.team-button-label { flex: 1; text-align: left; }
+.team-button-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 680px) { .team-button { height: 44px; } }
+
+/* Team dialog layout: one 8px rhythm, every row 40px tall, all columns aligned. */
+#teamDialog { width: min(520px, calc(100vw - 32px)); padding: 24px; }
+#teamDialog .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 40px; margin: 0 0 8px; }
+#teamDialog .dialog-head h2 { margin: 0; line-height: 40px; }
+#teamDialog #closeTeam { width: 40px; height: 40px; }
+#teamDialog > form > p.small { margin: 0 0 20px; font-size: 12px; line-height: 18px; color: var(--muted); }
+#teamList { display: grid; gap: 8px; }
+#teamDialog .team-row { grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 12px; margin: 0; height: 40px; }
+#teamDialog .team-row .avatar-picker summary { width: 40px; height: 40px; }
+#teamDialog .team-row .assignee-avatar { width: 36px; height: 36px; font-size: 12px; }
+#teamDialog .team-row input[data-field="name"] { height: 40px; margin: 0; padding: 0 12px; box-sizing: border-box; font-size: 14px; }
+#teamDialog .team-remove { width: 40px; height: 40px; padding: 0; margin: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+#teamDialog .team-remove svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#teamDialog .team-remove:hover, #teamDialog .team-remove:focus-visible { color: #d8453b; background: color-mix(in srgb, #d8453b 10%, transparent); }
+#teamDialog #addTeamMember { display: flex; align-items: center; gap: 12px; width: 100%; height: 40px; margin: 8px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 14px; text-align: left; }
+#teamDialog #addTeamMember::before { content: ""; flex: none; width: 36px; height: 36px; margin-left: 2px; border-radius: 50%; border: 1px dashed currentColor; box-sizing: border-box;
+  /* Drawn plus: a text "+" sits on the font baseline and never looks centred. */
+  background: linear-gradient(currentColor, currentColor) center / 12px 1.5px no-repeat, linear-gradient(currentColor, currentColor) center / 1.5px 12px no-repeat; }
+#teamDialog #addTeamMember:hover { color: var(--ink); }
+#teamDialog #teamError { margin: 8px 0 0; }
+#teamDialog #teamError[hidden] { display: none; }
+#teamDialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin: 24px 0 0; padding: 0; border: 0; }
+#teamDialog .actions button { height: 40px; margin: 0; padding: 0 18px; }

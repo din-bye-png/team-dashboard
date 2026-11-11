@@ -1,6 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
 import {expiredMessage} from './auth-link.js';
 import {validMaterials,MAX_FILE_SIZE} from './task-materials.js';
+import {validTeam,validAssignments} from './assignments.js';
 
 export function configured(config) {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(config.supabaseUrl)
@@ -19,13 +20,14 @@ export function validTask(t) {
     && text(t.person,200)&&text(t.note,10000)&&['active','blocked','waiting','done'].includes(t.status)
     && text(t.start,10)&&text(t.end,10)&&(!t.start||validDate(t.start))&&(!t.end||validDate(t.end))
     && (!t.start||!t.end||t.start<=t.end)&&Array.isArray(t.milestones)&&t.milestones.length<=100
-    && t.milestones.every(m=>m&&validDate(m.date)&&text(m.label,500))&&validMaterials(t);
+    && t.milestones.every(m=>m&&validDate(m.date)&&text(m.label,500))&&validMaterials(t)&&validAssignments(t);
 }
 export function validState(state) {
   return !!state && Array.isArray(state.tasks)&&state.tasks.length<=500&&state.tasks.every(validTask)
     && new Set(state.tasks.map(t=>t.id)).size===state.tasks.length
     && Array.isArray(state.trash)&&state.trash.length<=1000
     && state.trash.every(item=>validTask(item.task)&&typeof item.deletedAt==='string'&&!isNaN(Date.parse(item.deletedAt)))
+    && validTeam(state.team)
     && new TextEncoder().encode(JSON.stringify(state)).length<=1_000_000;
 }
 
@@ -34,7 +36,7 @@ export function prepareChange(plan, body, restored, now=new Date().toISOString()
     const error=new Error('План изменился у коллеги. Проверьте новую версию.');
     error.code=409;error.plan=plan;throw error;
   }
-  const state=structuredClone({tasks:plan.tasks,trash:plan.trash});
+  const state=structuredClone({tasks:plan.tasks,trash:plan.trash,team:plan.team||[]});
   const cutoff=new Date(Date.parse(now)-30*86400000).toISOString();
   state.trash=state.trash.filter(x=>x.deletedAt>=cutoff);
   let reason;
@@ -71,7 +73,17 @@ export function prepareChange(plan, body, restored, now=new Date().toISOString()
       if(!Array.isArray(incoming)||!incoming.every(validTask))fail('Некорректные задачи');
       for(const task of state.tasks)if(!incoming.some(t=>t.id===task.id))state.trash.push({task,deletedAt:now});
       state.tasks=structuredClone(incoming);state.trash=state.trash.filter(x=>!incoming.some(t=>t.id===x.task.id));
+      // Bring back people the restored tasks refer to; nobody already in the team is removed.
+      const incomingTeam=body.action==='replace'?body.team:restored?.team;
+      if(incomingTeam!==undefined){
+        if(!validTeam(incomingTeam))fail('Некорректная команда');
+        for(const person of incomingTeam)if(!state.team.some(p=>p.id===person.id))state.team.push(structuredClone(person));
+      }
       reason=body.action==='replace'?'План восстановлен из файла':'Восстановлена версия плана';break;
+    }
+    case 'team': {
+      if(!validTeam(body.team))fail('Проверьте имена в команде');
+      state.team=structuredClone(body.team);reason='Изменён состав команды';break;
     }
     default: fail('Неизвестное действие');
   }

@@ -84,7 +84,7 @@ async function uploadTaskAttachments(){
 $('#copySummary').onclick=()=>{
  const f=$('#form').elements;
  const milestones=[...$('#milestones').children].map(row=>row.querySelector('input[type="date"]').value+' — '+row.querySelector('input:not([type="date"])').value);
- copyText([f.title.value,f.person.value+' · '+statusLabel[f.status.value],f.end.value?'Дедлайн: '+f.end.value:'',f.context.value,f.note.value,...draftLinks.filter(link=>!link.removed).map(l=>l.title+': '+l.url),...draftAttachments.filter(file=>!file.removed).map(a=>'Файл: '+a.name),...milestones].filter(Boolean).join('\n\n'));
+ copyText([f.title.value,personSummary({assignments:collectAssignments(),person:tasks.find(t=>t.id===editing)?.person},team)+' · '+statusLabel[f.status.value],f.end.value?'Дедлайн: '+f.end.value:'',f.context.value,f.note.value,...draftLinks.filter(link=>!link.removed).map(l=>l.title+': '+l.url),...draftAttachments.filter(file=>!file.removed).map(a=>'Файл: '+a.name),...milestones].filter(Boolean).join('\n\n'));
 };
 $('#copyTaskLink').onclick=()=>{const url=new URL(location.href);url.hash='task='+encodeURIComponent(editing);copyText(url.href)};
 let shareToken=null,shareBusy=false,shareRequest=0;
@@ -136,7 +136,7 @@ window.addEventListener('hashchange',()=>{handledTaskHash='';openLinkedTask()});
 
 let taskDraftBaseline='';
 function taskDraftSnapshot(){
- return JSON.stringify({fields:[...new FormData($('#form'))].filter(([,v])=>typeof v==='string'),milestones:[...document.querySelectorAll('#milestones input')].map(el=>el.value),links:draftLinks,attachments:draftAttachments,linkTitle:$('#linkTitle').value,linkUrl:$('#linkUrl').value});
+ return JSON.stringify({fields:[...new FormData($('#form'))].filter(([,v])=>typeof v==='string'),milestones:[...document.querySelectorAll('#milestones input')].map(el=>el.value),assignments:[...document.querySelectorAll('#assignments select, #assignments input')].map(el=>el.value),links:draftLinks,attachments:draftAttachments,linkTitle:$('#linkTitle').value,linkUrl:$('#linkUrl').value});
 }
 function markTaskDraftClean(){taskDraftBaseline=taskDraftSnapshot()}
 function hasTaskDraftChanges(){return $('#editor').open&&taskDraftBaseline!==taskDraftSnapshot()}
