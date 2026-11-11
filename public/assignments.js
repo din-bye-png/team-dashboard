@@ -70,3 +70,36 @@ export function assignmentSegments(task,team,from,to){
   .map(a=>{const start=a.start<from?from:a.start,end=a.end>to?to:a.end;
    return {assignment:a,person:people.get(a.personId),offset:days(start,from),length:days(end,start)+1,total,clippedStart:a.start<from}});
 }
+
+// Time slices of the visible bar range: each slice is a run of days with the same
+// people at work. Parallel assignments share one slice, so the bar never needs
+// extra rows; a handover starts a new slice.
+export function assignmentSlices(task,team,from,to){
+ const segments=assignmentSegments(task,team,from,to);
+ if(!segments.length)return [];
+ const total=segments[0].total,cuts=[...new Set(segments.flatMap(s=>[s.offset,s.offset+s.length]))].sort((a,b)=>a-b);
+ const slices=[];
+ for(let i=0;i<cuts.length-1;i++){
+  const a=cuts[i],b=cuts[i+1];
+  const members=segments.filter(s=>s.offset<=a&&s.offset+s.length>=b);
+  if(!members.length)continue;
+  const key=members.map(s=>s.assignment.id).join('+'),last=slices.at(-1);
+  if(last&&last.key===key&&last.offset+last.length===a){last.length+=b-a;continue}
+  slices.push({key,offset:a,length:b-a,total,members:members.map(s=>({person:s.person,assignment:s.assignment}))});
+ }
+ return slices;
+}
+// "8 ч" for one person, "по 8 ч" when everyone has the same hours, "8 + 4 ч" otherwise.
+export function sliceHoursLabel(members){
+ const hours=members.map(m=>m.assignment.hours);
+ if(hours.length===1)return hoursLabel(hours[0]);
+ if(hours.every(h=>h===hours[0]))return 'по '+hoursLabel(hours[0]);
+ return hours.map(h=>String(h).replace('.',',')).join(' + ')+' ч';
+}
+export const sliceHours=members=>members.reduce((sum,m)=>sum+m.assignment.hours,0);
+// Label text for a slice: names for one or two people, a head count for three or more.
+export function sliceLabel(members){
+ if(members.length<=2)return members.map(m=>firstName(m.person.name)).join(', ')+' · '+sliceHoursLabel(members);
+ const n=members.length,word=n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?'человека':'человек';
+ return n+' '+word+' · '+hoursLabel(sliceHours(members));
+}

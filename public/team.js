@@ -8,18 +8,21 @@ function avatar(person,extra=''){
 }
 
 function assignmentLayer(task,from,to){
- const segments=assignmentSegments(task,team,from,to);
- if(!segments.length)return {className:'',layer:'',lead:'',chips:'',nameStyle:''};
- const pct=n=>n/segments[0].total*100;
- const chip=s=>`${avatar(s.person)}<span class="assignee-label">${esc(firstName(s.person.name))} · ${hoursLabel(s.assignment.hours)}</span>`;
- const layer=`<span class="assignment-layer" aria-hidden="true">${segments.map((s,i)=>{
-  const prev=segments[i-1],joined=prev&&prev.offset+prev.length===s.offset;
-  return `<span class="assignment-segment${joined?' is-handover':''}" style="left:${pct(s.offset)}%;width:${pct(s.length)}%;--load:${loadMix(s.assignment.hours)}%"></span>`;
+ const slices=assignmentSlices(task,team,from,to);
+ if(!slices.length)return {className:'',layer:'',lead:'',chips:'',nameStyle:''};
+ const pct=n=>n/slices[0].total*100;
+ // Parallel people share one label: a small avatar stack, first names and hours.
+ const stack=members=>{const shown=members.slice(0,3),more=members.length-shown.length;
+  return `<span class="assignee-stack">${shown.map(m=>avatar(m.person)).join('')}${more?`<span class="assignee-avatar assignee-more">+${more}</span>`:''}</span>`};
+ const chip=s=>`${stack(s.members)}<span class="assignee-label">${esc(sliceLabel(s.members))}</span>`;
+ const layer=`<span class="assignment-layer" aria-hidden="true">${slices.map((s,i)=>{
+  const prev=slices[i-1],joined=prev&&prev.offset+prev.length===s.offset;
+  return `<span class="assignment-segment${joined?' is-handover':''}" style="left:${pct(s.offset)}%;width:${pct(s.length)}%;--load:${loadMix(sliceHours(s.members))}%"></span>`;
  }).join('')}</span>`;
- // Every segment gets its own label; layoutAssignmentLabels decides which one rides
+ // Every slice gets its own label; layoutAssignmentLabels decides which one rides
  // next to the title at the visible edge and which ones shrink or hide.
  const lead='<span class="assignee-chip is-lead" aria-hidden="true" hidden></span>';
- const chips=segments.map(s=>`<span class="assignee-chip" aria-hidden="true" data-id="${esc(s.assignment.id)}" data-from="${pct(s.offset)}" data-to="${pct(s.offset+s.length)}" style="left:calc(${pct(s.offset)}% + 6px)">${chip(s)}</span>`).join('');
+ const chips=slices.map(s=>`<span class="assignee-chip" aria-hidden="true" data-id="${esc(s.key)}" data-from="${pct(s.offset)}" data-to="${pct(s.offset+s.length)}" style="left:calc(${pct(s.offset)}% + 6px)">${chip(s)}</span>`).join('');
  return {className:'has-assignments',layer,lead,chips,nameStyle:''};
 }
 
@@ -46,14 +49,19 @@ function layoutAssignmentLabels(bar){
  const minTitle=Math.min(titleWidth,96),limit=detailLeft-gap-start;
  slot.classList.remove('is-compact');
  if(!slot.hidden&&titleWidth+gap+slot.offsetWidth>limit){slot.classList.add('is-compact');if(minTitle+gap+slot.offsetWidth>limit)slot.hidden=true}
- const groupWidth=Math.min(titleWidth,Math.max(minTitle,limit-(slot.hidden?0:gap+slot.offsetWidth)))+(slot.hidden?0:gap+slot.offsetWidth);
- let groupEnd=start+groupWidth;
+ // Measure where the title group really ends now that the lead label is settled.
+ let groupEnd=name.getBoundingClientRect().right-box.left;
  if(detail&&detail.offsetParent&&groupEnd+gap>detailLeft){detail.classList.add('is-hidden');}
  for(const s of segments){
   s.chip.classList.remove('is-compact','is-hidden');
   if(s===current||s.to<=start+1){s.chip.classList.add('is-hidden');continue}
-  const left=s.from+6,room=Math.min(s.to,detail&&!detail.classList.contains('is-hidden')?detailLeft-gap:width-14)-left-6;
-  if(left<groupEnd+gap){s.chip.classList.add('is-hidden');continue}
+  // A label the title group covers moves just past it while the bar sits still; while the
+  // title is sliding (sticky) it hides instead, so nothing is repositioned frame by frame.
+  const end=Math.min(s.to,detail&&!detail.classList.contains('is-hidden')?detailLeft-gap:width-14);
+  let left=s.from+6;
+  if(left<groupEnd+gap){if(start>15){s.chip.classList.add('is-hidden');continue}left=groupEnd+gap}
+  s.chip.style.left=left===s.from+6?`calc(${s.chip.dataset.from}% + 6px)`:left+'px';
+  const room=end-left-6;
   if(s.chip.offsetWidth>room)s.chip.classList.add('is-compact');
   if(s.chip.offsetWidth>room)s.chip.classList.add('is-hidden');
  }
