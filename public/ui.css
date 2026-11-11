@@ -499,3 +499,8 @@ dialog::backdrop { background: #00000038; backdrop-filter: blur(5px); -webkit-ba
 #teamDialog #teamError[hidden] { display: none; }
 #teamDialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin: 24px 0 0; padding: 0; border: 0; }
 #teamDialog .actions button { height: 40px; margin: 0; padding: 0 18px; }
+
+/* Dark theme: black flags vanish on the dark track and radar cards. Light flags with a
+   thin dark halo stay readable both on the background and on top of pastel task bars. */
+[data-theme='dark'] .event-flag, [data-theme='dark'] .checkpoint { color: #f4f4f6; }
+[data-theme='dark'] .checkpoint { filter: drop-shadow(0 0 1px #000000d9) drop-shadow(0 0 1px #00000099); }
