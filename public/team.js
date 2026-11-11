@@ -33,37 +33,54 @@ function assignmentLayer(task,from,to){
 // - that label shrinks to the avatar, then hides, when the title needs the room;
 // - a later label shrinks to the avatar if its segment is narrow and hides while the
 //   title group passes over it; the deadline date hides when the title reaches it.
+// Fits one label into `room` pixels: names are shortened letter by letter (with an
+// ellipsis), then only the avatars remain, and the label hides only when not even
+// the avatars fit. Returns the width it now takes.
+function fitAssigneeLabel(chip,room,extra=0){
+ const stack=chip.querySelector('.assignee-stack'),label=chip.querySelector('.assignee-label');
+ chip.classList.remove('is-compact','is-hidden');if(label)label.style.maxWidth='';
+ const stackWidth=(stack?stack.offsetWidth:0)+extra;
+ if(room<stackWidth){chip.classList.add('is-hidden');return 0}
+ if(!label)return stackWidth;
+ const labelRoom=room-stackWidth-5,natural=label.scrollWidth;
+ if(labelRoom<16){chip.classList.add('is-compact');return stackWidth}
+ if(labelRoom<natural)label.style.maxWidth=labelRoom+'px';
+ return stackWidth+5+Math.min(natural,labelRoom);
+}
 function layoutAssignmentLabels(bar){
  const width=bar.clientWidth,name=bar.querySelector('.bar-name'),slot=bar.querySelector('.assignee-chip.is-lead'),title=bar.querySelector('.bar-title'),detail=bar.querySelector('.bar-detail');
  if(!width||!name||!slot||!title)return;
  const box=bar.getBoundingClientRect(),gap=8;
  const segments=[...bar.querySelectorAll('.assignee-chip[data-from]')].map(chip=>({chip,from:Number(chip.dataset.from)/100*width,to:Number(chip.dataset.to)/100*width}));
- const start=name.getBoundingClientRect().left-box.left,titleWidth=title.scrollWidth;
+ const start=name.getBoundingClientRect().left-box.left,titleWidth=title.scrollWidth,sliding=start>15;
  // The person beside the title is whoever's segment lies under that label itself.
  const at=x=>segments.find(s=>s.from<=x+1&&s.to>x+1);
  const current=at(start+titleWidth+gap)||at(start);
  if(current){if(slot.dataset.for!==current.chip.dataset.id){slot.innerHTML=current.chip.innerHTML;slot.dataset.for=current.chip.dataset.id}slot.hidden=false}
  else{slot.hidden=true;slot.dataset.for=''}
  if(detail)detail.classList.remove('is-hidden');
- const detailLeft=detail&&detail.offsetParent?detail.getBoundingClientRect().left-box.left:width-14;
- const minTitle=Math.min(titleWidth,96),limit=detailLeft-gap-start;
- slot.classList.remove('is-compact');
- if(!slot.hidden&&titleWidth+gap+slot.offsetWidth>limit){slot.classList.add('is-compact');if(minTitle+gap+slot.offsetWidth>limit)slot.hidden=true}
- // Measure where the title group really ends now that the lead label is settled.
- let groupEnd=name.getBoundingClientRect().right-box.left;
- if(detail&&detail.offsetParent&&groupEnd+gap>detailLeft){detail.classList.add('is-hidden');}
+ let detailLeft=detail&&detail.offsetParent?detail.getBoundingClientRect().left-box.left:width-14;
+ // The date gives way first when the title itself needs the room.
+ if(detail&&detail.offsetParent&&start+Math.min(titleWidth,96)+gap>detailLeft){detail.classList.add('is-hidden');detailLeft=width-14}
+ // The lead label gets what the title leaves before the next person's label (or the
+ // date), shrinking letter by letter as that label comes closer (9px: divider).
+ const next=segments.filter(s=>s!==current&&s.from>start+1).reduce((m,s)=>Math.min(m,s.from+6),Infinity);
+ if(!slot.hidden)fitAssigneeLabel(slot,Math.min(detailLeft,next)-gap-start-titleWidth-gap,9);
+ if(slot.classList.contains('is-hidden')){slot.classList.remove('is-hidden');slot.hidden=true}
+ const groupEnd=name.getBoundingClientRect().right-box.left;
+ if(detail&&detail.offsetParent&&groupEnd+gap>detailLeft){detail.classList.add('is-hidden');detailLeft=width-14}
+ const end=detail&&!detail.classList.contains('is-hidden')?detailLeft-gap:width-14;
  for(const s of segments){
-  s.chip.classList.remove('is-compact','is-hidden');
-  if(s===current||s.to<=start+1){s.chip.classList.add('is-hidden');continue}
-  // A label the title group covers moves just past it while the bar sits still; while the
-  // title is sliding (sticky) it hides instead, so nothing is repositioned frame by frame.
-  const end=Math.min(s.to,detail&&!detail.classList.contains('is-hidden')?detailLeft-gap:width-14);
+  s.chip.style.clipPath='';
+  if(s===current||s.to<=start+1){s.chip.classList.remove('is-compact');s.chip.classList.add('is-hidden');continue}
+  // While the bar sits still a covered label moves just past the title. While the title
+  // slides, labels stay put and the title passes over them like a curtain, letter by letter.
   let left=s.from+6;
-  if(left<groupEnd+gap){if(start>15){s.chip.classList.add('is-hidden');continue}left=groupEnd+gap}
+  if(!sliding&&left<groupEnd+gap)left=groupEnd+gap;
   s.chip.style.left=left===s.from+6?`calc(${s.chip.dataset.from}% + 6px)`:left+'px';
-  const room=end-left-6;
-  if(s.chip.offsetWidth>room)s.chip.classList.add('is-compact');
-  if(s.chip.offsetWidth>room)s.chip.classList.add('is-hidden');
+  const taken=fitAssigneeLabel(s.chip,Math.min(s.to,end)-left-6);
+  const covered=groupEnd+gap-left;
+  if(sliding&&covered>0){if(covered>=taken)s.chip.classList.add('is-hidden');else s.chip.style.clipPath=`inset(0 0 0 ${covered}px)`}
  }
 }
 
