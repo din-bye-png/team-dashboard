@@ -19,7 +19,7 @@ async function api(path,body){
  if(started!==authEpoch)throw new Error('Сеанс завершён');
  return result;
 }
-function applyPlan(plan){if(!plan||plan.revision<revision)return;if(taskReorder)cancelTaskReorder();const changed=!ready||revision!==plan.revision;tasks=plan.tasks;revision=plan.revision;ready=true;if(changed)render();controls();status('');queueMicrotask(openLinkedTask);}
+function applyPlan(plan){if(!plan||plan.revision<revision)return;if(taskReorder)cancelTaskReorder();const changed=!ready||revision!==plan.revision;tasks=plan.tasks;team=plan.team||[];revision=plan.revision;ready=true;if(changed)render();controls();status('');queueMicrotask(openLinkedTask);}
 async function refresh(){
  if(polling||saving||uploadingMaterials||taskReorder||taskResize)return;polling=true;
  try{const {plan}=await api('plan');if(plan){const changed=plan.revision!==revision;applyPlan(plan);if(changed&&$('#editor').open){$('#editWarning').textContent='План обновился у коллеги. Ваш текст остаётся в форме; при сохранении проверим конфликт.';$('#editWarning').hidden=false}queueFile()}}
@@ -42,12 +42,15 @@ $('#form').onsubmit=async e=>{
  e.preventDefault();if(!ready||saving||uploadingMaterials)return;
  const f=e.target.elements;
  if(f.start.value&&f.end.value&&f.start.value>f.end.value){toast('Дедлайн должен быть не раньше начала');return}
+ const assignments=collectAssignments();
+ if(!validAssignments({assignments})){toast('Проверьте исполнителей: конец работы должен быть не раньше начала.');return}
  if(!$('#linkComposer').hidden&&($('#linkTitle').value.trim()||$('#linkUrl').value.trim())){if(!addDraftLink())return}
  uploadingMaterials=true;controls();$('#saveTask').textContent='Сохраняем…';
  try{
  const attachments=await uploadTaskAttachments();
- const task={context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:f.person.value.trim()||'Не назначен',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.querySelector('input[type="date"]').value,label:row.querySelector('input:not([type="date"])').value.trim()}))};
+ const task={assignments,context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:'',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.querySelector('input[type="date"]').value,label:row.querySelector('input:not([type="date"])').value.trim()}))};
  if(!task.title)return;
+ task.person=personSummary(task,team);
  if(await change('upsert',{task},editRevision))$('#editor').close();
  }catch(error){toast(error.message)}finally{uploadingMaterials=false;controls();$('#saveTask').textContent='Сохранить'}
 };
@@ -58,9 +61,9 @@ $('#import').onclick=()=>$('#file').click();
 $('#file').onchange=async e=>{
  try{
   const file=e.target.files[0];if(!file)return;if(file.size>30_000_000)throw new Error('Файл слишком большой');
-  const data=JSON.parse(await file.text()),incoming=Array.isArray(data)?data:data.tasks;
-  if(!valid(incoming))throw new Error('Некорректный файл плана');
-  if(confirm('Восстановить '+incoming.length+' задач из файла в общий план для всей команды? Текущая версия останется в истории.'))await change('replace',{tasks:incoming});
+  const data=JSON.parse(await file.text()),incoming=Array.isArray(data)?data:data.tasks,incomingTeam=Array.isArray(data)?undefined:data.team;
+  if(!valid(incoming)||!validTeam(incomingTeam))throw new Error('Некорректный файл плана');
+  if(confirm('Восстановить '+incoming.length+' задач из файла в общий план для всей команды? Текущая версия останется в истории.'))await change('replace',{tasks:incoming,...(incomingTeam?{team:incomingTeam}:{})});
  }catch(error){toast(error.message||'Не удалось прочитать файл')}finally{e.target.value=''}
 };
 async function loadArchive(){
@@ -110,12 +113,12 @@ async function boot(){
  catch(error){ready=false;controls();status(error.message,true);return false;}
 }
 function clearPrivateView(){
- authEpoch++;ready=false;revision=0;editRevision=0;archiveRevision=0;tasks=[];editing=null;view='all';
+ authEpoch++;ready=false;revision=0;editRevision=0;archiveRevision=0;tasks=[];team=[];editing=null;view='all';
  fileHandle=null;fileRevision=-1;cancelTaskReorder();cancelTaskResize();hideFlagTooltip();flagTooltip.innerHTML='';
  for(const dialog of document.querySelectorAll('dialog'))if(dialog.open)dialog.close();
  $('#form').reset();resetTaskContext();handledTaskHash='';$('#milestones').replaceChildren();$('#editWarning').textContent='';
  for(const id of ['trashList','versionList','versionPreview'])$('#'+id).replaceChildren();
- $('#person').value='';render();controls();$('#dashboard').hidden=true;$('#authScreen').hidden=authInitializing;
+ render();controls();$('#dashboard').hidden=true;$('#authScreen').hidden=authInitializing;
  $('#authForm').reset();$('#toast').textContent='';fileStatus('Файл не выбран');
  $('#passwordForm').reset();$('#passwordForm').hidden=true;$('#authForm').hidden=false;$('#passwordError').textContent='';
 }
