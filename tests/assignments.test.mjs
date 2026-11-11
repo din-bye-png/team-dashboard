@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validTeam,validAssignments,initials,loadMix,assignmentSegments} from '../public/assignments.js';
+import {validTeam,validAssignments,initials,loadMix,assignmentSegments,assignmentSlices,sliceHoursLabel,sliceHours,sliceLabel} from '../public/assignments.js';
 import {validState,prepareChange} from '../public/backend.js';
 
 const team=[{id:'ilya',name:'Илья Краснов',hours:8},{id:'masha',name:'Маша',hours:4}];
@@ -48,4 +48,26 @@ test('restoring a version or a JSON file brings back missing people without remo
  assert.deepEqual(fromFile.team.map(p=>p.id),['masha','new','ilya']);
  assert.deepEqual(prepareChange(plan,{action:'replace',tasks:[task],baseRevision:5}).state.team,plan.team);
  assert.throws(()=>prepareChange(plan,{action:'replace',tasks:[task],team:[{id:'x',name:''}],baseRevision:5}));
+});
+
+test('parallel people share time slices; handovers start new ones',()=>{
+ const crew=[...team,{id:'dima',name:'Дима'}];
+ const parallel={...task,assignments:[
+  {id:'d',personId:'dima',start:'2026-11-09',end:'2026-11-20',hours:6},
+  {id:'i',personId:'ilya',start:'2026-11-12',end:'2026-11-15',hours:2},
+  {id:'m',personId:'masha',start:'2026-11-16',end:'2026-11-20',hours:6}]};
+ const slices=assignmentSlices(parallel,crew,'2026-11-09','2026-11-20');
+ assert.deepEqual(slices.map(s=>[s.offset,s.length,s.members.map(m=>m.person.id).join('+')]),
+  [[0,3,'dima'],[3,4,'dima+ilya'],[7,5,'dima+masha']]);
+ assert.equal(sliceHoursLabel(slices[0].members),'6 ч');
+ assert.equal(sliceHoursLabel(slices[1].members),'6 + 2 ч');
+ assert.equal(sliceHoursLabel(slices[2].members),'по 6 ч');
+ assert.equal(sliceLabel(slices[1].members),'Дима, Илья · 6 + 2 ч');
+ const many=n=>Array.from({length:n},(_,i)=>({person:{id:'p'+i,name:'P'+i},assignment:{hours:4}}));
+ assert.equal(sliceLabel(many(3)),'3 человека · 12 ч');assert.equal(sliceLabel(many(5)),'5 человек · 20 ч');
+ assert.equal(sliceHours(slices[1].members),8);assert.equal(loadMix(sliceHours(slices[2].members)),100);
+ // Sequential work keeps one slice per person, and gaps stay empty.
+ assert.deepEqual(assignmentSlices(task,team,'2026-11-09','2026-11-20').map(s=>[s.offset,s.length,s.members.length]),[[0,6,1],[6,6,1]]);
+ const gap={...task,assignments:[{id:'a',personId:'ilya',start:'2026-11-09',end:'2026-11-10',hours:8},{id:'b',personId:'ilya',start:'2026-11-14',end:'2026-11-15',hours:8}]};
+ assert.deepEqual(assignmentSlices(gap,team,'2026-11-09','2026-11-20').map(s=>[s.offset,s.length]),[[0,2],[5,2]]);
 });

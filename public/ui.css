@@ -512,3 +512,12 @@ dialog::backdrop { background: #00000038; backdrop-filter: blur(5px); -webkit-ba
 .bar .bar-name, .bar.has-assignments .bar-name { position: sticky; left: calc(var(--label-width, 200px) + 14px); z-index: 1; }
 /* Sized to its text so it has room to slide; the date stays pinned right. */
 .bar .bar-name { flex: 0 1 auto; margin-right: auto; }
+
+/* Parallel assignees: overlapping avatars, each outlined in the bar colour so the stack reads as separate people. */
+.assignee-stack { display: inline-flex; flex: none; }
+.assignee-stack .assignee-avatar + .assignee-avatar { margin-left: -6px; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--color) 85%, var(--surface)); }
+.assignee-more { background: var(--surface); color: var(--ink); font-size: 8px; }
+.tooltip-assignees .assignee-avatar { box-shadow: none; }
+
+/* Names shorten letter by letter instead of vanishing at once. */
+.assignee-label { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
