@@ -85,7 +85,7 @@ function render(){
   panel.innerHTML=[...el.options].map(o=>`<button type="button" class="picker-option" role="option" aria-selected="${o.selected}" data-option="${esc(o.value)}" tabindex="${o.selected?0:-1}" ${o.disabled?'disabled':''}><span>${esc(o.textContent)}</span><span class="picker-check" aria-hidden="true">${o.selected?'✓':''}</span></button>`).join('');return;
  }
  const year=month.getFullYear(),m=month.getMonth();panel.classList.add('calendar-picker');
- const title=month.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
+ const title=month.toLocaleDateString('ru-RU',{month:'long'})+' '+year;
  let content='';
  if(active.stage==='months'){
   content=`<div class="calendar-year"><button type="button" data-action="year-previous" aria-label="Предыдущий год">‹</button><strong aria-live="polite">${year}</strong><button type="button" data-action="year-next" aria-label="Следующий год">›</button></div><div class="calendar-months">`+Array.from({length:12},(_,i)=>`<button type="button" data-month="${i}" aria-pressed="${m===i}">${new Date(year,i,1).toLocaleDateString('ru-RU',{month:'short'})}</button>`).join('')+'</div>';

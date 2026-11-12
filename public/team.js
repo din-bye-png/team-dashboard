@@ -92,7 +92,7 @@ function assignmentTooltip(task){
 
 // Task card: one row per assignment.
 function addAssignment(a){
- if(!team.length){toast('Сначала добавьте людей в команду в меню «···» → «Команда»');openTeam();return}
+ if(!team.length){toast('Сначала добавьте людей в команду');openTeam();return}
  const rows=[...$('#assignments').children],last=rows.at(-1),f=$('#form').elements;
  if(!a){
   // Hours are set per task; a new row starts from a full day or the previous row's hours.
@@ -111,7 +111,7 @@ function resetAssignments(task={}){
  $('#assignments').replaceChildren();(task.assignments||[]).forEach(addAssignment);
  // Tasks created before assignees existed keep their old free-text owner until someone is assigned.
  const legacy=!task.assignments?.length&&task.person&&task.person!=='Не назначен'?task.person:'';
- $('#legacyPerson').hidden=!legacy;$('#legacyPerson').textContent=legacy?'Раньше ответственным был указан: '+legacy+'. Добавьте исполнителя из команды.':'';
+ $('#legacyPerson').hidden=!legacy;$('#legacyPerson').textContent=legacy?'Раньше исполнитель был записан текстом: '+legacy+'. Выберите его из команды.':'';
 }
 // Toolbar button: a small stack of team avatars that opens the roster.
 function renderTeamButton(){
@@ -131,7 +131,8 @@ $('#addAssignment').onclick=()=>addAssignment();
 
 // Roster dialog: the only place where people are named and given an avatar (colour or a small photo).
 // Hours are not set here: they belong to each task assignment.
-const colorSwatches=()=>Object.entries(AVATAR_COLORS).map(([key,[bg]])=>`<button type="button" class="avatar-swatch" data-color="${key}" style="--swatch:${bg}" aria-label="Цвет ${key}"></button>`).join('');
+const COLOR_NAMES={yellow:'Жёлтый',blue:'Синий',pink:'Розовый',green:'Зелёный',coral:'Коралловый',violet:'Фиолетовый',gray:'Серый',black:'Чёрный'};
+const colorSwatches=()=>Object.entries(AVATAR_COLORS).map(([key,[bg]])=>`<button type="button" class="avatar-swatch" data-color="${key}" style="--swatch:${bg}" aria-label="${COLOR_NAMES[key]||key}"></button>`).join('');
 function rowPerson(row){return {id:row.dataset.id,name:row.querySelector('[data-field="name"]').value.trim(),...(row.dataset.color?{color:row.dataset.color}:{}),...(row.photo?{photo:row.photo}:{})}}
 function refreshRowAvatar(row){
  const p=rowPerson(row);row.querySelector('.avatar-picker summary').innerHTML=avatar({...p,name:p.name||'?'});
@@ -154,9 +155,9 @@ function teamRow(p={id:crypto.randomUUID(),name:''}){
  row.querySelector('.avatar-swatches').onclick=e=>{const b=e.target.closest('[data-color]');if(!b)return;row.dataset.color=b.dataset.color;row.photo='';refreshRowAvatar(row);row.querySelector('.avatar-picker').open=false};
  row.querySelector('.avatar-upload input').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;try{row.photo=await photoDataURL(file);refreshRowAvatar(row);row.querySelector('.avatar-picker').open=false}catch(error){toast(error.message)}};
  row.querySelector('.avatar-remove-photo').onclick=()=>{row.photo='';refreshRowAvatar(row)};
- row.querySelector('.team-remove').onclick=()=>{
+ row.querySelector('.team-remove').onclick=async()=>{
   const used=tasks.filter(t=>(t.assignments||[]).some(a=>a.personId===p.id)).length;
-  if(used&&!confirm(`${p.name||'Этот человек'} назначен в задачах: ${used}. Эти назначения перестанут показываться на Ганте. Убрать?`))return;
+  if(used&&!await ask({title:'Убрать из команды?',text:`${p.name||'Этот человек'} — исполнитель в ${used===1?'одной задаче':'задачах: '+used}. С Ганта эти назначения пропадут.`,confirm:'Убрать',danger:true}))return;
   row.remove();
  };
  $('#teamList').append(row);initPickers(row);refreshRowAvatar(row);return row;
@@ -177,7 +178,7 @@ $('#teamForm').onsubmit=async e=>{
  const next=[...$('#teamList').children].map(rowPerson).filter(p=>p.name);
  if(!validTeam(next)){$('#teamError').textContent='Проверьте имена.';$('#teamError').hidden=false;return}
  const before=revision;
- if(await change('team',{team:next})){
+ if(await change('team',{team:next},revision,'Команда сохранена')){
   if(editRevision===before)editRevision=revision;
   $('#teamDialog').close();
   // Refresh person lists in an open task card without losing chosen values.

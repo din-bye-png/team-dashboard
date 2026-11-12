@@ -5,14 +5,16 @@ import vm from 'node:vm';
 
 // Exercise the actual editor guard with form and dialog boundaries stubbed.
 const source=readFileSync(new URL('../public/task-context.js',import.meta.url),'utf8');
-const guard=source.slice(source.indexOf("let taskDraftBaseline='';"),source.indexOf('const discardDraft='));
+const guard=source.slice(source.indexOf("let taskDraftBaseline='';"),source.indexOf('// One confirmation dialog'));
 function editor(){
  const form={fields:[['title','Название'],['context','Контекст']]};
  const modal={open:true,close(){this.open=false}};
- const discard={open:false,showModal(){this.open=true}};
+ // Stands in for the shared confirmation dialog: opens and waits for an answer.
+ const discard={open:false,answer:null};
+ const ask=()=>{discard.open=true;return new Promise(resolve=>{discard.answer=resolve})};
  const nodes={'#form':form,'#editor':modal,'#linkTitle':{value:''},'#linkUrl':{value:''}};
  const milestones=[{value:'2026-11-12'},{value:'Показ'}];
- const context=vm.createContext({$:s=>nodes[s],document:{querySelectorAll:()=>milestones},FormData:class{constructor(f){return f.fields}},draftLinks:[],draftAttachments:[],saving:false,uploadingMaterials:false,discardDraft:discard});
+ const context=vm.createContext({$:s=>nodes[s],document:{querySelectorAll:()=>milestones},FormData:class{constructor(f){return f.fields}},draftLinks:[],draftAttachments:[],saving:false,uploadingMaterials:false,ask});
  vm.runInContext(guard,context);
  context.markTaskDraftClean();
  return {context,form,modal,discard,milestones};
@@ -23,6 +25,13 @@ test('unchanged and reverted drafts close without prompting; changed text stays 
  assert.equal(e.modal.open,true);assert.equal(e.discard.open,true);
  e.discard.open=false;e.form.fields[0][1]='Название';e.context.requestTaskClose();
  assert.equal(e.modal.open,false);assert.equal(e.discard.open,false);
+});
+test('confirming the prompt closes the editor; declining keeps the draft',async()=>{
+ for(const [answer,open] of [[false,true],[true,false]]){
+  const e=editor();e.form.fields[0][1]='Другое название';e.context.requestTaskClose();
+  e.discard.answer(answer);await new Promise(setImmediate);
+  assert.equal(e.modal.open,open);
+ }
 });
 test('checkpoint, link, attachment and unfinished link changes protect the draft',()=>{
  for(const change of [e=>e.milestones[0].value='2026-11-13',e=>e.context.draftLinks.push({title:'Макет',url:'https://example.com'}),e=>e.context.draftAttachments.push({name:'brief.pdf',size:1024}),e=>vm.runInContext("$('#linkUrl').value='https://example.com'",e.context)]){
