@@ -1,0 +1,118 @@
+/* Design tokens: the only place where colours, type sizes, radii and control sizes are defined.
+   style.css and ui.css read these and never redefine them. The sign-in screen keeps its own
+   fixed Figma values and is the one exception. */
+:root {
+  /* Colour */
+  --page: #f2f2f7;
+  --surface: #fff;
+  --subtle: #f5f5f7;
+  --hover: #ededf2;
+  --ink: #1d1d1f;
+  --muted: #636366;
+  --line: #e8e8ed;
+  --border: #dcdce2;
+  --pill: #eeeef3;
+  --stat-background: #fafafd;
+  --stat-selected: #fff;
+  --stat-hover: #f5f5f8;
+  --blue: #0066cc;
+  --action: #0071e3;
+  --action-ink: #fff;
+  --create: #171719;       /* «Новая задача»: black on light, white on dark */
+  --create-ink: #fff;
+  --create-hover: #2a2a2d;
+  --on-accent: #fff;       /* text on --action, --today */
+  --on-pastel: #17191c;    /* text on task bars and avatars, same in both themes */
+  --danger: #d93640;
+  --today: var(--danger);
+  --today-line: var(--danger);
+  --red: var(--danger);
+  --glass: rgba(255,255,255,.86);
+  --shadow: 0 12px 36px #00000016, 0 1px 4px #00000008;
+  --shadow-s: 0 1px 3px #00000012;
+  --shadow-dialog: 0 24px 80px #00000030;
+  --backdrop: #00000038;
+  --highlight: #ffffff26;  /* top edge of task bars */
+  --hairline: #0000001a;   /* outline of colour swatches */
+  --warning-bg: #fff5d8;
+  --warning-ink: #74541b;
+
+  /* Checkpoint flags: black on light; on dark, light with a thin dark halo so they stay
+     readable both on the track and on top of pastel task bars. */
+  --flag: #000;
+  --flag-hover: #ffffffcc;
+  --flag-halo: none;
+
+  /* File type icons; the tinted background is mixed from the icon colour. */
+  --file-pdf: #e3453e;
+  --file-green: #32a269;
+  --file-folder: #d2a535;
+
+  /* Task palette (Figma frame 46:2400), shared by the timeline and radar in both themes. */
+  --task-yellow: #fdf998;
+  --task-blue: #95c7fa;
+  --task-pink: #ef90b2;
+  --task-green: #a7fbae;
+  --task-coral: #f09d8b;
+  --task-violet: #b28bf8;
+  --task-yellow-soft: color-mix(in srgb, var(--task-yellow) 18%, var(--surface));
+  --task-blue-soft: color-mix(in srgb, var(--task-blue) 18%, var(--surface));
+  --task-pink-soft: color-mix(in srgb, var(--task-pink) 18%, var(--surface));
+  --task-green-soft: color-mix(in srgb, var(--task-green) 18%, var(--surface));
+  --task-coral-soft: color-mix(in srgb, var(--task-coral) 18%, var(--surface));
+  --task-violet-soft: color-mix(in srgb, var(--task-violet) 18%, var(--surface));
+
+  /* Type scale. 2xs is for initials inside avatars only. */
+  --text-2xs: .5625rem;  /*  9px */
+  --text-xs: .6875rem;   /* 11px */
+  --text-s: .75rem;      /* 12px */
+  --text-m: .8125rem;    /* 13px, body */
+  --text-l: .875rem;     /* 14px */
+  --text-xl: 1.0625rem;  /* 17px */
+  --text-2xl: 1.25rem;   /* 20px */
+  --text-3xl: 1.75rem;   /* 28px */
+
+  /* Radii. Circles use 50%. */
+  --radius-xs: 4px;
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* Controls */
+  --control-s: 36px;
+  --control-m: 44px;
+  --field-height: var(--control-m);
+  --field-line-height: 20px;
+  --field-padding-y: 11px;
+  --field-radius: var(--radius-s);
+}
+:root[data-theme='dark'] {
+  --page: #1c1c1e;
+  --surface: #242426;
+  --subtle: #2c2c2e;
+  --hover: #363638;
+  --ink: #f5f5f7;
+  --muted: #b0b0b8;
+  --line: #363638;
+  --border: #48484b;
+  --pill: #363638;
+  --stat-background: #343436;
+  --stat-selected: #48484a;
+  --stat-hover: #3a3a3c;
+  --blue: #64aaff;
+  --create: #f5f5f7;
+  --create-ink: #1d1d1f;
+  --create-hover: #dedee3;
+  --danger: #ff6961;
+  --flag: #f4f4f6;
+  --flag-hover: #ffffff20;
+  --flag-halo: drop-shadow(0 0 1px #000000d9) drop-shadow(0 0 1px #00000099);
+  --glass: rgba(44,44,46,.90);
+  --shadow: 0 12px 36px #0005, 0 1px 4px #0003;
+}
+@media (prefers-contrast:more) {
+  :root { --muted: #48484a; --border: #8e8e93; --line: #aeaeb2; }
+  :root[data-theme='dark'] { --muted: #d1d1d6; --border: #8e8e93; --line: #636366; }
+}

@@ -25,25 +25,26 @@ async function refresh(){
  try{const {plan}=await api('plan');if(plan){const changed=plan.revision!==revision;applyPlan(plan);if(changed&&$('#editor').open){$('#editWarning').textContent='План обновился у коллеги. Ваш текст остаётся в форме; при сохранении проверим конфликт.';$('#editWarning').hidden=false}queueFile()}}
  catch(error){status(error.message||'Нет связи с сервером',true)}finally{polling=false}
 }
-async function change(action,payload={},baseRevision=revision){
+async function change(action,payload={},baseRevision=revision,done='Сохранено в общем плане'){
  if(saving||!ready)return false;saving=true;controls();status('Сохраняем на сервере…');
- try{const {plan}=await api('change',{action,baseRevision,...payload});applyPlan(plan);toast('Сохранено в общем плане');queueFile();return true}
+ try{const {plan}=await api('change',{action,baseRevision,...payload});applyPlan(plan);toast(done);queueFile();return true}
  catch(error){
   if(error.plan)applyPlan(error.plan);
   if(error.code===409&&$('#editor').open){
    const current=tasks.find(t=>t.id===editing);
-   $('#editWarning').textContent=error.message+(current?' Текущая задача на сервере: '+current.title+' · '+current.person+' · '+(current.end||'без срока')+'. Ваши поля сохранены. Сверьте их и нажмите «Сохранить» повторно.':' Ваши поля сохранены. Проверьте план перед повторным сохранением.');
+   $('#editWarning').textContent=error.message+(current?' Текущая задача на сервере: '+current.title+' · '+current.person+' · '+(current.end?fmt(current.end):'без дедлайна')+'. Ваши поля сохранены. Сверьте их и нажмите «Сохранить» повторно.':' Ваши поля сохранены. Проверьте план перед повторным сохранением.');
    $('#editWarning').hidden=false;editRevision=revision;
   }
   status(error.message,true);toast(error.message);return false;
  }finally{saving=false;controls()}
 }
+function formProblem(message){$('#editWarning').textContent=message;$('#editWarning').hidden=false;$('#editWarning').scrollIntoView({block:'nearest'})}
 $('#form').onsubmit=async e=>{
  e.preventDefault();if(!ready||saving||uploadingMaterials)return;
  const f=e.target.elements;
- if(f.start.value&&f.end.value&&f.start.value>f.end.value){toast('Дедлайн должен быть не раньше начала');return}
+ if(f.start.value&&f.end.value&&f.start.value>f.end.value){formProblem('Дедлайн должен быть не раньше начала.');return}
  const assignments=collectAssignments();
- if(!validAssignments({assignments})){toast('Проверьте исполнителей: конец работы должен быть не раньше начала.');return}
+ if(!validAssignments({assignments})){formProblem('Проверьте исполнителей: конец работы должен быть не раньше начала.');return}
  if(!$('#linkComposer').hidden&&($('#linkTitle').value.trim()||$('#linkUrl').value.trim())){if(!addDraftLink())return}
  uploadingMaterials=true;controls();$('#saveTask').textContent='Сохраняем…';
  try{
@@ -51,10 +52,10 @@ $('#form').onsubmit=async e=>{
  const task={assignments,context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:'',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.querySelector('input[type="date"]').value,label:row.querySelector('input:not([type="date"])').value.trim()}))};
  if(!task.title)return;
  task.person=personSummary(task,team);
- if(await change('upsert',{task},editRevision))$('#editor').close();
+ if(await change('upsert',{task},editRevision,'Задача сохранена'))$('#editor').close();
  }catch(error){toast(error.message)}finally{uploadingMaterials=false;controls();$('#saveTask').textContent='Сохранить'}
 };
-$('#delete').onclick=async()=>{if(confirm('Переместить задачу в корзину на 30 дней?')&&await change('delete',{id:editing},editRevision))$('#editor').close()};
+$('#delete').onclick=async()=>{if(await ask({title:'Удалить задачу?',text:'Она останется в корзине на 30 дней — оттуда её можно вернуть.',confirm:'Удалить',danger:true})&&await change('delete',{id:editing},editRevision,'Задача перемещена в корзину'))$('#editor').close()};
 function download(data,name){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('#export').onclick=async()=>{try{download(await api('backup'),'team-plan-'+TODAY+'.json');toast('Резервная копия скачана')}catch(error){toast(error.message)}};
 $('#import').onclick=()=>$('#file').click();
@@ -62,8 +63,8 @@ $('#file').onchange=async e=>{
  try{
   const file=e.target.files[0];if(!file)return;if(file.size>30_000_000)throw new Error('Файл слишком большой');
   const data=JSON.parse(await file.text()),incoming=Array.isArray(data)?data:data.tasks,incomingTeam=Array.isArray(data)?undefined:data.team;
-  if(!valid(incoming)||!validTeam(incomingTeam))throw new Error('Некорректный файл плана');
-  if(confirm('Восстановить '+incoming.length+' задач из файла в общий план для всей команды? Текущая версия останется в истории.'))await change('replace',{tasks:incoming,...(incomingTeam?{team:incomingTeam}:{})});
+  if(!valid(incoming)||!validTeam(incomingTeam))throw new Error('Это не резервная копия плана');
+  if(await ask({title:'Восстановить план из копии?',text:'Общий план всей команды заменится планом из файла: '+taskCountLabel(incoming.length)+'. Текущая версия останется в истории.',confirm:'Восстановить'}))await change('replace',{tasks:incoming,...(incomingTeam?{team:incomingTeam}:{})},revision,'План восстановлен из копии');
  }catch(error){toast(error.message||'Не удалось прочитать файл')}finally{e.target.value=''}
 };
 async function loadArchive(){
@@ -75,17 +76,17 @@ async function loadArchive(){
  }catch(error){toast(error.message)}
 }
 $('#history').onclick=()=>{$('.more').open=false;$('#archive').showModal();loadArchive()};$('#closeArchive').onclick=()=>$('#archive').close();$('#refreshArchive').onclick=loadArchive;
-$('#trashList').onclick=async e=>{const button=e.target.closest('[data-restore-task]');if(button&&await change('restoreTask',{id:button.dataset.restoreTask},archiveRevision))loadArchive()};
+$('#trashList').onclick=async e=>{const button=e.target.closest('[data-restore-task]');if(button&&await change('restoreTask',{id:button.dataset.restoreTask},archiveRevision,'Задача возвращена в план'))loadArchive()};
 $('#versionList').onclick=async e=>{
  const button=e.target.closest('[data-version]');if(!button)return;
  try{
   const v=await api('version?revision='+button.dataset.version),preview=$('#versionPreview');
-  preview.innerHTML=`<h3>Версия ${v.revision} · ${v.tasks.length} задач</h3><ul>${v.tasks.map(t=>`<li>${esc(t.title)} — ${esc(t.person)} · ${esc(t.end||'без срока')}</li>`).join('')}</ul><button id="restoreVersion" class="primary">Восстановить эту версию</button>`;preview.hidden=false;
-  $('#restoreVersion').onclick=async()=>{if(confirm('Восстановить весь план из версии '+v.revision+' для всей команды? Текущий план останется в истории.')&&await change('restoreVersion',{revision:v.revision},archiveRevision))loadArchive()};preview.scrollIntoView({block:'nearest'});
+  preview.innerHTML=`<h3>Версия ${v.revision} · ${taskCountLabel(v.tasks.length)}</h3><ul>${v.tasks.map(t=>`<li>${esc(t.title)} — ${esc(t.person)} · ${esc(t.end?fmt(t.end):'без дедлайна')}</li>`).join('')}</ul><button id="restoreVersion" class="primary">Восстановить эту версию</button>`;preview.hidden=false;
+  $('#restoreVersion').onclick=async()=>{if(await ask({title:'Восстановить версию '+v.revision+'?',text:'Общий план всей команды вернётся к этой версии. Текущий план останется в истории.',confirm:'Восстановить'})&&await change('restoreVersion',{revision:v.revision},archiveRevision,'План восстановлен из версии '+v.revision))loadArchive()};preview.scrollIntoView({block:'nearest'});
  }catch(error){toast(error.message)}
 };
 // File access is opt-in and kept only in memory for this signed-in session.
-function fileStatus(message){$('#fileStatus').textContent=message;$('#localFile').textContent=fileHandle?'Файл: '+fileHandle.name:'Файл на компьютере';$('#disconnectFile').hidden=!fileHandle}
+function fileStatus(message){$('#fileStatus').textContent=message;$('#localFile').textContent=fileHandle?'Автокопия: '+fileHandle.name:'Автокопия на компьютер';$('#disconnectFile').hidden=!fileHandle}
 async function writeLocalFile(){
  const handle=fileHandle;if(!handle||!ready||fileRevision===revision)return;
  if(await handle.queryPermission({mode:'readwrite'})!=='granted'){$('#resumeFile').hidden=false;fileStatus('Нужно разрешение на запись в '+handle.name);return}
@@ -97,7 +98,7 @@ function queueFile(){fileQueue=fileQueue.then(writeLocalFile).catch(error=>{file
 $('#localFile').onclick=()=>{$('.more').open=false;$('#fileDialog').showModal()};$('#closeFile').onclick=()=>$('#fileDialog').close();
 $('#chooseFile').onclick=async()=>{
  try{
-  if(!window.showSaveFilePicker){toast('Для автозаписи откройте сайт в Chrome или Edge');return}
+  if(!window.showSaveFilePicker){toast('Автокопия работает в Chrome и Edge');return}
   const handle=await window.showSaveFilePicker({suggestedName:'team-plan-backup.json',types:[{description:'Резервная копия плана',accept:{'application/json':['.json']}}]});
   fileHandle=handle;fileRevision=-1;fileStatus('Записываем '+handle.name+'…');
   await queueFile();
@@ -105,7 +106,7 @@ $('#chooseFile').onclick=async()=>{
 };
 $('#resumeFile').onclick=async()=>{try{if(fileHandle&&await fileHandle.requestPermission({mode:'readwrite'})==='granted'){fileRevision=-1;await queueFile()}}catch(error){fileStatus(error.message)}};
 $('#disconnectFile').onclick=async()=>{fileHandle=null;fileRevision=-1;await fileQueue;$('#resumeFile').hidden=true;fileStatus('Файл отключён. Уже записанная копия осталась на компьютере.')};
-$('#fileSupport').textContent=window.showSaveFilePicker?'Сайт записывает только выбранный вами файл.':'В этом браузере автозапись недоступна. Можно скачать копию через меню или открыть сайт в Chrome/Edge.';
+$('#fileSupport').textContent=window.showSaveFilePicker?'Сайт записывает только выбранный вами файл.':'В этом браузере автокопия недоступна. Скачайте копию через меню или откройте сайт в Chrome или Edge.';
 $('#chooseFile').disabled=!window.showSaveFilePicker;
 async function boot(){
  controls();render();

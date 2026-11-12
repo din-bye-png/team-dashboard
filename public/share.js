@@ -10,7 +10,7 @@ function render(task){
  $('#taskTitle').textContent=task.title;document.title=task.title+' · Паспорт задачи';
  $('#taskPerson').textContent=task.person||'Не назначен';$('#taskStatus').textContent=statuses[task.status]||task.status;
  $('#taskStart').textContent=date(task.start);$('#taskEnd').textContent=date(task.end);
- $('#taskContext').textContent=task.context||'Контекст пока не добавлен.';
+ $('#taskContext').textContent=task.context||'Описание пока не добавлено.';
  $('#taskNote').textContent=task.note||'Примечаний пока нет.';
  const links=$('#taskLinks');links.replaceChildren();
  for(const item of task.links||[]){const url=safeMaterialUrl(item.url);if(!url)continue;const row=document.createElement('li');addText(row,'strong',item.title||new URL(url).hostname);const anchor=addText(row,'a',url);anchor.href=url;anchor.target='_blank';anchor.rel='noopener noreferrer';links.append(row)}

@@ -7,15 +7,18 @@ let taskResize=null;
 const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!isNaN(parse(s))&&iso(parse(s))===s;
 function valid(data){return Array.isArray(data)&&data.length<=500&&data.every(t=>t&&validMaterials(t)&&validAssignments(t)&&typeof t.id==='string'&&typeof t.title==='string'&&typeof t.person==='string'&&typeof t.note==='string'&&['active','blocked','waiting','done'].includes(t.status)&&(!t.start||validDate(t.start))&&(!t.end||validDate(t.end))&&(!t.start||!t.end||t.start<=t.end)&&Array.isArray(t.milestones)&&t.milestones.every(m=>validDate(m.date)&&typeof m.label==='string'))&&new Set(data.map(t=>t.id)).size===data.length}
 
+const plural=(n,[one,few,many])=>n+' '+(n%10===1&&n%100!==11?one:n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?few:many);
+const taskCountLabel=n=>plural(n,['задача','задачи','задач']);
 function toast(s){$('#toast').textContent=s;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),2500)}
 const PALETTE=['yellow','blue','pink','green','coral','violet'];
-const colors=t=>{const name=PALETTE[[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%PALETTE.length];return [`var(--task-${name})`,`var(--task-${name}-soft)`,'#17191c']};
+const colors=t=>{const name=PALETTE[[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%PALETTE.length];return [`var(--task-${name})`,`var(--task-${name}-soft)`,'var(--on-pastel)']};
 const statusLabel={active:'В работе',blocked:'На стопе',waiting:'Ожидаем вводных',done:'Готово'};
 const taskFilters=[
  {id:'all',label:'Всего задач',matches:()=>true},
  {id:'active',label:'В работе',matches:t=>t.status==='active'},
- {id:'undated',label:'Без срока',matches:t=>!t.end&&t.status!=='done'},
  {id:'blocked',label:'На стопе',matches:t=>t.status==='blocked'},
+ {id:'waiting',label:'Ожидаем вводных',matches:t=>t.status==='waiting'},
+ {id:'done',label:'Готово',matches:t=>t.status==='done'},
 ];
 import {statIcons} from './filter-icons.js';
 import {initPickers,syncPickers,closePickers} from './pickers.js';
@@ -41,11 +44,11 @@ let dates=Array.from({length:DAYS},(_,i)=>day(calendarStart,i)),todayIndex=diff(
 for(const t of visible){let[c,bg,ink]=colors(t),style=`--color:${c};--tint:${bg};--bar-ink:${ink}`,start=t.start||BASE;let left=Math.max(0,diff(start,calendarStart)),right=Math.min(DAYS,diff(t.end,calendarStart)+1);let bar='';
 if(t.end&&right>left&&diff(start,calendarStart)<DAYS){const detail=t.status==='blocked'?'На стопе':fmt(t.end);const compact=(right-left)*dayWidth-10<150;const crew=assignmentLayer(t,day(calendarStart,left),day(calendarStart,right-1));bar=`<div class="bar ${t.status} ${compact?'compact':''} ${crew.className}" style="left:calc(${left/DAYS*100}% + 5px);width:calc(${(right-left)/DAYS*100}% - 10px)" tabindex="0" role="button" aria-label="${esc(t.title)}: открыть задачу">${crew.layer}<span class="bar-name" style="${crew.nameStyle}"><span class="bar-title">${esc(t.title)}</span>${crew.lead}</span>${crew.chips}<span class="bar-detail">${esc(detail)}</span>${diff(start,calendarStart)>=0?`<span class="bar-resize-handle resize-start" data-resize-edge="start" role="slider" tabindex="0" aria-label="Начало задачи ${esc(t.title)}" aria-valuemin="${diff(calendarStart,'1970-01-01')}" aria-valuemax="${diff(t.end,'1970-01-01')}" aria-valuenow="${diff(start,'1970-01-01')}" aria-valuetext="${esc(fmt(start))}" title="Потяните, чтобы изменить начало"></span>`:''}${diff(t.end,calendarStart)<DAYS?`<span class="bar-resize-handle resize-end" data-resize-edge="end" role="slider" tabindex="0" aria-label="Дедлайн задачи ${esc(t.title)}" aria-valuemin="${diff(start,'1970-01-01')}" aria-valuemax="${diff(day(calendarStart,DAYS-1),'1970-01-01')}" aria-valuenow="${diff(t.end,'1970-01-01')}" aria-valuetext="${esc(fmt(t.end))}" title="Потяните, чтобы изменить дедлайн"></span>`:''}</div>`}
 
-if(!t.end)bar=`<span class="undated" tabindex="0" role="button" aria-label="${esc(t.title)}: открыть задачу">${t.status==='waiting'?'↩ Ждём обратную связь':'··· Дедлайн не указан'}</span>`;
+if(!t.end)bar=`<span class="undated" tabindex="0" role="button" aria-label="${esc(t.title)}: открыть задачу">Дедлайн не указан</span>`;
 let flags=t.milestones.filter(m=>diff(m.date,calendarStart)>=0&&diff(m.date,calendarStart)<DAYS).map(m=>`<button class="checkpoint${m.date<TODAY?' is-past':''}" data-edit="${esc(t.id)}" style="left:${(diff(m.date,calendarStart)+.5)/DAYS*100}%" data-tooltip-label="${esc(m.label)}" data-tooltip-date="${esc(fmt(m.date))}" data-tooltip-task="${esc(t.title)}" aria-label="${esc(m.label)} · ${fmt(m.date)}">⚑</button>`).join('');
-html+=`<div class="task-row" data-task-id="${esc(t.id)}" style="${style}"><div class="task-label-cell"><button class="task-drag-handle" aria-label="Переместить ${esc(t.title)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-move="${esc(t.id)}"><svg viewBox="0 0 12 18" aria-hidden="true"><path d="M3 3h.01M9 3h.01M3 9h.01M9 9h.01M3 15h.01M9 15h.01"/></svg></button><button class="task-label" data-edit="${esc(t.id)}"><div><div class="task-title">${esc(t.title)}</div><div class="task-meta"><span class="status-badge">${statusLabel[t.status]+(t.end&&t.end<TODAY&&t.status!=='done'?' · Просрочена':'')}</span></div></div></button></div><div class="track" data-edit="${esc(t.id)}">${dates.map(d=>`<div class="cell ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"></div>`).join('')}${todayIndex>=0&&todayIndex<DAYS?`<div class="today-line" style="left:${(todayIndex+.5)/DAYS*100}%"></div>`:''}${bar}${flags}</div></div>`;
+html+=`<div class="task-row" data-task-id="${esc(t.id)}" style="${style}"><div class="task-label-cell"><button class="task-drag-handle" aria-label="Переместить ${esc(t.title)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-move="${esc(t.id)}"><svg viewBox="0 0 12 18" aria-hidden="true"><path d="M3 3h.01M9 3h.01M3 9h.01M9 9h.01M3 15h.01M9 15h.01"/></svg></button><button class="task-label" data-edit="${esc(t.id)}"><div><div class="task-title">${esc(t.title)}</div><div class="task-meta"><span class="status-badge">${statusLabel[t.status]}${t.end&&t.end<TODAY&&t.status!=='done'?' · <span class="is-overdue">Просрочена</span>':''}</span></div></div></button></div><div class="track" data-edit="${esc(t.id)}">${dates.map(d=>`<div class="cell ${[0,6].includes(parse(d).getDay())?'weekend':''} ${d===TODAY?'current':''}"></div>`).join('')}${todayIndex>=0&&todayIndex<DAYS?`<div class="today-line" style="left:${(todayIndex+.5)/DAYS*100}%"></div>`:''}${bar}${flags}</div></div>`;
 }
-$('#gantt').innerHTML=html+(visible.length?'':'<p style="padding:30px;color:#aaa">Задач по этому фильтру нет.</p>');
+$('#gantt').innerHTML=html+(visible.length?'':'<p class="gantt-empty">Задач по этому фильтру нет.</p>');
 $('.scroll').scrollLeft=42*dayWidth;$('#gantt').style.setProperty('--calendar-offset',$('.scroll').scrollLeft+'px');
 const events=visible.filter(t=>t.status!=='done').flatMap(t=>[...t.milestones,...(t.end&&!t.milestones.some(m=>m.date===t.end)?[{date:t.end,label:'Дедлайн'}]:[])].map(m=>({...m,task:t}))).filter(m=>m.date>=TODAY).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
 let lastDate='';
@@ -90,7 +93,7 @@ function showFlagTooltip(anchor){
  if(anchor.matches('.bar,.undated')){
   const task=tasks.find(t=>t.id===anchor.closest('.task-row')?.dataset.taskId);
   if(!task){hideFlagTooltip();return}
-  flagTooltip.innerHTML=`<strong>${esc(task.title)}</strong>${assignmentTooltip(task)}<p class="task-comment">${esc(task.note.trim()||'Комментариев пока нет')}</p>`;
+  flagTooltip.innerHTML=`<strong>${esc(task.title)}</strong>${assignmentTooltip(task)}<p class="task-comment">${esc(task.note.trim()||'Примечаний пока нет')}</p>`;
  }else flagTooltip.innerHTML=`<strong>${esc(anchor.dataset.tooltipLabel)}</strong><span>${esc(anchor.dataset.tooltipDate)} · ${esc(anchor.dataset.tooltipTask)}</span>`;
  flagTooltip.hidden=false;
  const r=anchor.getBoundingClientRect(),t=flagTooltip.getBoundingClientRect();

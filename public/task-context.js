@@ -24,7 +24,7 @@ function renderMaterials(){
  $('#attachmentCount').textContent=attachmentCount?'· '+attachmentCount:'';
  $('#materialsCount').textContent=linkCount+attachmentCount?'· '+(linkCount+attachmentCount):'';
  $('#linksHeading').hidden=!draftLinks.length;$('#filesHeading').hidden=!draftAttachments.length;
- $('#taskLinks').innerHTML=draftLinks.length?draftLinks.map((link,i)=>link.removed?`<div class="material-row material-removed">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)}</strong><small role="status">Ссылка убрана из задачи</small></div><button type="button" class="restore-material" data-restore-link="${i}" aria-label="Вернуть ссылку ${esc(link.title)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)} ↗</strong><a href="${esc(safeMaterialUrl(link.url)||'#')}" target="_blank" rel="noopener noreferrer">${esc(link.url)}</a></div><button type="button" data-copy-link="${i}" aria-label="Копировать ссылку ${esc(link.title)}">Копировать</button><button type="button" class="remove-material" data-remove-link="${i}" aria-label="Убрать ссылку ${esc(link.title)}">×</button></div>`).join(''):'';
+ $('#taskLinks').innerHTML=draftLinks.length?draftLinks.map((link,i)=>link.removed?`<div class="material-row material-removed">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)}</strong><small role="status">Ссылка убрана из задачи</small></div><button type="button" class="restore-material" data-restore-link="${i}" aria-label="Вернуть ссылку ${esc(link.title)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(link)}<div class="material-info"><strong>${esc(link.title||new URL(link.url).hostname)} ↗</strong><a href="${esc(safeMaterialUrl(link.url)||'#')}" target="_blank" rel="noopener noreferrer">${esc(link.url)}</a></div><button type="button" data-copy-link="${i}" aria-label="Скопировать ссылку ${esc(link.title)}">Скопировать</button><button type="button" class="remove-material" data-remove-link="${i}" aria-label="Убрать ссылку ${esc(link.title)}">×</button></div>`).join(''):'';
  $('#taskAttachments').innerHTML=draftAttachments.length?draftAttachments.map((file,i)=>file.removed?`<div class="material-row material-removed">${materialIcon(file)}<div class="material-info"><strong>${esc(file.name)}</strong><small role="status">Файл убран из задачи</small></div><button type="button" class="restore-material" data-restore-file="${i}" aria-label="Вернуть файл ${esc(file.name)}">↶ Вернуть</button></div>`:`<div class="material-row">${materialIcon(file)}<div class="material-info"><strong>${esc(file.name)}</strong><small>${esc(file.name.split('.').pop().toUpperCase())} · ${sizeLabel(file.size)}${file.pendingFile?' · К сохранению':''}</small></div><button type="button" data-download-file="${i}" aria-label="Скачать ${esc(file.name)}">↓ Скачать</button><button type="button" class="remove-material" data-remove-file="${i}" aria-label="Убрать файл ${esc(file.name)}">×</button></div>`).join(''):'';
 }
 async function copyText(value){try{await navigator.clipboard.writeText(value);toast('Скопировано')}catch{toast('Не удалось скопировать. Проверьте доступ к буферу обмена.')}}
@@ -103,20 +103,21 @@ async function loadTaskShare(id){
  try{
   const token=await backend.getTaskShare(id);
   if(request!==shareRequest||editing!==id||!$('#editor').open)return;
-  shareToken=token;$('#shareStatus').textContent=token?'Ссылка активна. Страница обновляется после сохранения задачи.':'Ссылка ещё не создана. Опубликуйте задачу, когда контекст будет готов.';
+  shareToken=token;$('#shareStatus').textContent=token?'Ссылка активна. Страница обновляется после сохранения задачи.':'Ссылка ещё не создана. Создайте её, когда описание будет готово.';
  }catch(error){if(request===shareRequest)$('#shareStatus').textContent=error.message}
  finally{if(request===shareRequest){shareBusy=false;renderTaskShare()}}
 }
 $('#shareToggle').onclick=async()=>{
  if(shareBusy||saving||uploadingMaterials||!ready)return;
  const id=editing,enabled=!shareToken;
- if(!enabled&&!confirm('Отключить публичную ссылку? Старый адрес перестанет открываться.'))return;
+ if(!enabled&&!await ask({title:'Отключить публичную ссылку?',text:'Старый адрес перестанет открываться.',confirm:'Отключить',danger:true}))return;
+ if(editing!==id||!$('#editor').open)return;
  const request=++shareRequest;shareBusy=true;renderTaskShare();
  try{
   const token=await backend.setTaskShare(id,enabled);
   if(request!==shareRequest||editing!==id||!$('#editor').open)return;
   shareToken=token;$('#shareStatus').textContent=token?'Ссылка активна. Несохранённые изменения появятся после сохранения задачи.':'Ссылка отключена. Старый адрес больше не работает.';
-  toast(token?'Паспорт опубликован':'Публичная ссылка отключена');
+  toast(token?'Публичная ссылка создана':'Публичная ссылка отключена');
  }catch(error){if(request===shareRequest){$('#shareStatus').textContent=error.message;toast(error.message)}}
  finally{if(request===shareRequest){shareBusy=false;renderTaskShare()}}
 };
@@ -143,13 +144,25 @@ function hasTaskDraftChanges(){return $('#editor').open&&taskDraftBaseline!==tas
 function requestTaskClose(){
  if(saving||uploadingMaterials)return;
  if(!hasTaskDraftChanges()){$('#editor').close();return}
- if(!discardDraft.open)discardDraft.showModal();
+ ask({title:'Закрыть без сохранения?',text:'В задаче есть несохранённые изменения.',confirm:'Закрыть без сохранения',cancel:'Вернуться к задаче',danger:true}).then(ok=>{if(ok)$('#editor').close()});
 }
-const discardDraft=document.createElement('dialog');discardDraft.id='discardDraft';discardDraft.setAttribute('aria-labelledby','discardDraftTitle');
-discardDraft.innerHTML='<h2 id="discardDraftTitle">Сохранить изменения?</h2><p>В задаче есть несохранённые изменения. Продолжите редактирование, чтобы сохранить их, или отбросьте черновик.</p><div class="discard-actions"><button type="button" id="discardChanges" class="danger">Отбросить</button><button type="button" id="keepEditing" class="primary" autofocus>Продолжить редактирование</button></div>';
-document.body.append(discardDraft);
-$('#keepEditing').onclick=()=>discardDraft.close();
-$('#discardChanges').onclick=()=>{discardDraft.close();$('#editor').close()};
+// One confirmation dialog for every "are you sure" question; replaces native confirm().
+// The confirming button is blue, or red for destructive actions; Escape answers "no".
+const confirmDialog=document.createElement('dialog');confirmDialog.id='confirmDialog';confirmDialog.setAttribute('aria-labelledby','confirmTitle');
+confirmDialog.innerHTML='<h2 id="confirmTitle"></h2><p></p><div class="confirm-actions"><button type="button" data-answer="no"></button><button type="button" data-answer="yes"></button></div>';
+document.body.append(confirmDialog);
+let confirmResolve=null;
+function ask({title,text='',confirm,cancel='Отмена',danger=false}){
+ if(confirmDialog.open)return Promise.resolve(false);
+ confirmDialog.querySelector('h2').textContent=title;
+ const body=confirmDialog.querySelector('p');body.textContent=text;body.hidden=!text;
+ const [no,yes]=confirmDialog.querySelectorAll('button');no.textContent=cancel;yes.textContent=confirm;yes.className=danger?'danger':'primary';
+ confirmDialog.showModal();(danger?no:yes).focus();
+ return new Promise(resolve=>{confirmResolve=resolve});
+}
+function answerConfirm(yes){const resolve=confirmResolve;confirmResolve=null;if(confirmDialog.open)confirmDialog.close();resolve?.(yes)}
+confirmDialog.addEventListener('click',e=>{const button=e.target.closest('[data-answer]');if(button)answerConfirm(button.dataset.answer==='yes')});
+confirmDialog.addEventListener('close',()=>answerConfirm(false));
 window.addEventListener('beforeunload',e=>{if(hasTaskDraftChanges()){e.preventDefault();e.returnValue=''}});
 const toolbarMenus=[...document.querySelectorAll('.toolbar details, .task-menu')];
 document.addEventListener('click',e=>{for(const menu of toolbarMenus){if(menu.open&&!menu.contains(e.target))menu.open=false}});
