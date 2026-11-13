@@ -12,8 +12,9 @@ test('bar edges snap to days, clamp to one day and preserve task context and che
  assert.equal(resize(task,'end',200).end,'2026-12-31');
  assert.equal(resize(task,'start',-200).start,'2026-10-01');
  assert.deepEqual(extended.links,task.links);assert.deepEqual(extended.milestones,task.milestones);assert.equal(extended.context,task.context);
- const saved=prepareChange({revision:1,tasks:[task],trash:[]},{action:'upsert',baseRevision:1,task:extended});
- assert.deepEqual(saved.state.tasks[0],extended);
+ const saved=prepareChange({revision:1,tasks:[task],trash:[]},{action:'upsert',baseRevision:1,task:extended},null,'2026-11-05T12:00:00');
+ // Dragging the deadline keeps every field and logs the move.
+ assert.deepEqual(saved.state.tasks[0],{...extended,deadlineShifts:[{from:'2026-11-06',to:'2026-11-09',at:'2026-11-05'}]});
  assert.throws(()=>prepareChange({revision:2,tasks:[task],trash:[]},{action:'upsert',baseRevision:1,task:extended}),e=>e.code===409);
 });
 test('resizing a deadline with unknown start does not invent a start date',()=>{

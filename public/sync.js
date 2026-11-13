@@ -52,7 +52,7 @@ $('#form').onsubmit=async e=>{
  const task={assignments,context:f.context.value,links:draftLinks.filter(link=>!link.removed).map(({title,url})=>({title,url})),attachments,id:editing||crypto.randomUUID(),title:f.title.value.trim(),person:'',status:f.status.value,start:f.start.value,end:f.end.value,note:f.note.value,milestones:[...$('#milestones').children].map(row=>({date:row.querySelector('input[type="date"]').value,label:row.querySelector('input:not([type="date"])').value.trim()}))};
  if(!task.title)return;
  task.person=personSummary(task,team);
- if(await change('upsert',{task},editRevision,'Задача сохранена'))$('#editor').close();
+ if(await change('upsert',f.clearShifts.value?{task,clearShifts:true}:{task},editRevision,'Задача сохранена'))$('#editor').close();
  }catch(error){toast(error.message)}finally{uploadingMaterials=false;controls();$('#saveTask').textContent='Сохранить'}
 };
 $('#delete').onclick=async()=>{if(await ask({title:'Удалить задачу?',text:'Она останется в корзине на 30 дней — оттуда её можно вернуть.',confirm:'Удалить',danger:true})&&await change('delete',{id:editing},editRevision,'Задача перемещена в корзину'))$('#editor').close()};
