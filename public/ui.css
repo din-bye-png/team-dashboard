@@ -95,6 +95,20 @@ textarea:focus-visible, .scroll:focus-visible, a:focus-visible,
 .more button { padding: 10px 12px; font-size:var(--text-m); border-radius:var(--radius-s); }
 .more hr { margin: 6px; border: 0; border-top: 1px solid var(--line); }
 .status-badge .is-overdue { color: var(--danger); }
+.status-badge .is-done { color: var(--done); }
+.status-badge .meta-shift { white-space: nowrap; }
+.status-badge .is-shifted { color: var(--shifted); font-weight: 500; }
+#editor .deadline-shift { margin: -7px 0 16px; font-size: var(--text-s); color: var(--muted); }
+#editor .deadline-shift summary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; list-style: none; border-radius: var(--radius-s); }
+#editor .deadline-shift summary::-webkit-details-marker { display: none; }
+#editor .deadline-shift summary::after { content: ''; width: 5px; height: 5px; margin-top: -3px; border-right: 1.5px solid; border-bottom: 1.5px solid; transform: rotate(45deg); }
+#editor .deadline-shift[open] summary::after { margin-top: 3px; transform: rotate(-135deg); }
+#editor .deadline-shift b { font-weight: 500; color: var(--shifted); }
+#editor .deadline-shift ul { list-style: none; margin: 6px 0 0; padding: 0; line-height: 1.8; color: var(--ink); }
+#editor .deadline-shift li span { color: var(--muted); }
+#editor .deadline-shift .shift-action { margin: 4px 0 0; padding: 0; border: 0; background: none; font-size: inherit; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+#editor .deadline-shift .shift-action:hover { color: var(--ink); }
+#editor p.deadline-shift .shift-action { margin: 0; }
 .theme-options button[aria-pressed='true'] { background: var(--action); color: var(--action-ink); }
 .stats { grid-template-columns: repeat(5,minmax(156px,1fr)); gap: 8px; overflow-x: auto; scrollbar-width: thin; }
 .stat { height: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--radius-m); background: var(--stat-background); box-shadow: none; gap: 10px; }

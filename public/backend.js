@@ -2,6 +2,7 @@ import {createClient} from '@supabase/supabase-js';
 import {expiredMessage} from './auth-link.js';
 import {validMaterials,MAX_FILE_SIZE} from './task-materials.js';
 import {validTeam,validAssignments} from './assignments.js';
+import {validShifts,recordShift} from './deadline-shifts.js';
 
 export function configured(config) {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(config.supabaseUrl)
@@ -20,7 +21,7 @@ export function validTask(t) {
     && text(t.person,200)&&text(t.note,10000)&&['active','blocked','waiting','done'].includes(t.status)
     && text(t.start,10)&&text(t.end,10)&&(!t.start||validDate(t.start))&&(!t.end||validDate(t.end))
     && (!t.start||!t.end||t.start<=t.end)&&Array.isArray(t.milestones)&&t.milestones.length<=100
-    && t.milestones.every(m=>m&&validDate(m.date)&&text(m.label,500))&&validMaterials(t)&&validAssignments(t);
+    && t.milestones.every(m=>m&&validDate(m.date)&&text(m.label,500))&&validMaterials(t)&&validAssignments(t)&&validShifts(t);
 }
 export function validState(state) {
   return !!state && Array.isArray(state.tasks)&&state.tasks.length<=500&&state.tasks.every(validTask)
@@ -44,6 +45,11 @@ export function prepareChange(plan, body, restored, now=new Date().toISOString()
     case 'upsert': {
       if(!validTask(body.task))fail('Проверьте поля задачи и даты');
       const task=structuredClone(body.task),exists=state.tasks.some(t=>t.id===task.id);
+      // The log of deadline moves is kept here, never taken from the caller, who can only
+      // ask to forget it (clearShifts): the saved deadline then counts as the original.
+      const day=new Date(now),today=`${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
+      const shifts=body.clearShifts?[]:recordShift(state.tasks.find(t=>t.id===task.id),task,today);
+      if(shifts.length)task.deadlineShifts=shifts;else delete task.deadlineShifts;
       state.tasks=exists?state.tasks.map(t=>t.id===task.id?task:t):[...state.tasks,task];
       state.trash=state.trash.filter(x=>x.task.id!==task.id);
       reason=exists?'Изменена задача':'Добавлена задача';break;
